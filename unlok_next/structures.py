@@ -13,7 +13,7 @@ try:
     structure_reg = get_default_structure_registry()
     structure_reg.register_as_structure(
         RoomFragment,
-        identifier="@unlok/room",
+        identifier="@lok/room",
         scope=PortScope.GLOBAL,
         aexpand=aget_room,
         ashrink=id_shrink,
