@@ -1,14 +1,13 @@
-from unlok_next.funcs import asubscribe, aexecute, subscribe, execute
-from typing_extensions import Literal
-from typing import Optional, AsyncIterator, List, Iterator
-from pydantic import BaseModel, Field
 from unlok_next.rath import UnlokRath
-from unlok_next.traits import RoomListener
+from unlok_next.funcs import execute, asubscribe, subscribe, aexecute
+from typing import AsyncIterator, Optional, Iterator, Literal, List, Tuple
+from rath.scalars import ID
 from enum import Enum
+from pydantic import Field, BaseModel
 
 
 class StructureInput(BaseModel):
-    object: str
+    object: ID
     identifier: str
 
     class Config:
@@ -19,11 +18,52 @@ class StructureInput(BaseModel):
         use_enum_values = True
 
 
-class MessageFragmentAgentRoom(RoomListener, BaseModel):
+class DevelopmentClientInput(BaseModel):
+    manifest: "ManifestInput"
+    composition: Optional[ID]
+    requirements: Tuple["Requirement", ...]
+
+    class Config:
+        """A config class"""
+
+        frozen = True
+        extra = "forbid"
+        use_enum_values = True
+
+
+class ManifestInput(BaseModel):
+    identifier: str
+    version: str
+    logo: Optional[str]
+    scopes: Tuple[str, ...]
+
+    class Config:
+        """A config class"""
+
+        frozen = True
+        extra = "forbid"
+        use_enum_values = True
+
+
+class Requirement(BaseModel):
+    service: str
+    optional: bool
+    description: Optional[str]
+    key: str
+
+    class Config:
+        """A config class"""
+
+        frozen = True
+        extra = "forbid"
+        use_enum_values = True
+
+
+class MessageFragmentAgentRoom(BaseModel):
     """Room(id, title, description, creator)"""
 
     typename: Optional[Literal["Room"]] = Field(alias="__typename", exclude=True)
-    id: str
+    id: ID
 
     class Config:
         """A config class"""
@@ -35,7 +75,7 @@ class MessageFragmentAgent(BaseModel):
     """Agent(id, room, name, app, user)"""
 
     typename: Optional[Literal["Agent"]] = Field(alias="__typename", exclude=True)
-    id: str
+    id: ID
     room: MessageFragmentAgentRoom
 
     class Config:
@@ -46,7 +86,7 @@ class MessageFragmentAgent(BaseModel):
 
 class MessageFragment(BaseModel):
     typename: Optional[Literal["Message"]] = Field(alias="__typename", exclude=True)
-    id: str
+    id: ID
     text: str
     "A clear text representation of the rich comment"
     agent: MessageFragmentAgent
@@ -62,7 +102,7 @@ class ListMessageFragmentAgent(BaseModel):
     """Agent(id, room, name, app, user)"""
 
     typename: Optional[Literal["Agent"]] = Field(alias="__typename", exclude=True)
-    id: str
+    id: ID
 
     class Config:
         """A config class"""
@@ -72,7 +112,7 @@ class ListMessageFragmentAgent(BaseModel):
 
 class ListMessageFragment(BaseModel):
     typename: Optional[Literal["Message"]] = Field(alias="__typename", exclude=True)
-    id: str
+    id: ID
     text: str
     "A clear text representation of the rich comment"
     agent: ListMessageFragmentAgent
@@ -84,9 +124,9 @@ class ListMessageFragment(BaseModel):
         frozen = True
 
 
-class RoomFragment(RoomListener, BaseModel):
+class RoomFragment(BaseModel):
     typename: Optional[Literal["Room"]] = Field(alias="__typename", exclude=True)
-    id: str
+    id: ID
     title: str
     "The Title of the Room"
     description: str
@@ -102,7 +142,7 @@ class SendMutation(BaseModel):
 
     class Arguments(BaseModel):
         text: str
-        room: str
+        room: ID
         agent_id: str = Field(alias="agentId")
         attach_structures: Optional[List[StructureInput]] = Field(
             alias="attachStructures", default=None
@@ -110,6 +150,16 @@ class SendMutation(BaseModel):
 
     class Meta:
         document = "fragment Message on Message {\n  id\n  text\n  agent {\n    id\n    room {\n      id\n    }\n  }\n}\n\nmutation Send($text: String!, $room: ID!, $agentId: String!, $attachStructures: [StructureInput!]) {\n  send(\n    input: {text: $text, room: $room, agentId: $agentId, attachStructures: $attachStructures}\n  ) {\n    ...Message\n  }\n}"
+
+
+class CreateClientMutation(BaseModel):
+    create_developmental_client: str = Field(alias="createDevelopmentalClient")
+
+    class Arguments(BaseModel):
+        input: DevelopmentClientInput
+
+    class Meta:
+        document = "mutation CreateClient($input: DevelopmentClientInput!) {\n  createDevelopmentalClient(input: $input)\n}"
 
 
 class CreateRoomMutation(BaseModel):
@@ -127,7 +177,7 @@ class GetRoomQuery(BaseModel):
     room: RoomFragment
 
     class Arguments(BaseModel):
-        id: str
+        id: ID
 
     class Meta:
         document = "fragment Room on Room {\n  id\n  title\n  description\n}\n\nquery GetRoom($id: ID!) {\n  room(id: $id) {\n    ...Room\n  }\n}"
@@ -147,8 +197,8 @@ class WatchRoomSubscription(BaseModel):
     room: WatchRoomSubscriptionRoom
 
     class Arguments(BaseModel):
-        room: str
-        agent_id: str = Field(alias="agentId")
+        room: ID
+        agent_id: ID = Field(alias="agentId")
 
     class Meta:
         document = "fragment ListMessage on Message {\n  id\n  text\n  agent {\n    id\n  }\n}\n\nsubscription WatchRoom($room: ID!, $agentId: ID!) {\n  room(room: $room, agentId: $agentId) {\n    message {\n      ...ListMessage\n    }\n  }\n}"
@@ -156,7 +206,7 @@ class WatchRoomSubscription(BaseModel):
 
 async def asend(
     text: str,
-    room: str,
+    room: ID,
     agent_id: str,
     attach_structures: Optional[List[StructureInput]] = None,
     rath: Optional[UnlokRath] = None,
@@ -169,10 +219,10 @@ async def asend(
 
     Arguments:
         text (str): text
-        room (str): room
+        room (ID): room
         agent_id (str): agentId
         attach_structures (Optional[List[StructureInput]], optional): attachStructures.
-        rath (unlok_next.rath.UnlokRath, optional): The arkitekt rath client
+        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
         MessageFragment"""
@@ -192,7 +242,7 @@ async def asend(
 
 def send(
     text: str,
-    room: str,
+    room: ID,
     agent_id: str,
     attach_structures: Optional[List[StructureInput]] = None,
     rath: Optional[UnlokRath] = None,
@@ -205,10 +255,10 @@ def send(
 
     Arguments:
         text (str): text
-        room (str): room
+        room (ID): room
         agent_id (str): agentId
         attach_structures (Optional[List[StructureInput]], optional): attachStructures.
-        rath (unlok_next.rath.UnlokRath, optional): The arkitekt rath client
+        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
         MessageFragment"""
@@ -222,6 +272,46 @@ def send(
         },
         rath=rath,
     ).send
+
+
+async def acreate_client(
+    input: DevelopmentClientInput, rath: Optional[UnlokRath] = None
+) -> str:
+    """CreateClient
+
+
+     createDevelopmentalClient: The `String` scalar type represents textual data, represented as UTF-8 character sequences. The String type is most often used by GraphQL to represent free-form human-readable text.
+
+
+    Arguments:
+        input (DevelopmentClientInput): input
+        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+
+    Returns:
+        str"""
+    return (
+        await aexecute(CreateClientMutation, {"input": input}, rath=rath)
+    ).create_developmental_client
+
+
+def create_client(
+    input: DevelopmentClientInput, rath: Optional[UnlokRath] = None
+) -> str:
+    """CreateClient
+
+
+     createDevelopmentalClient: The `String` scalar type represents textual data, represented as UTF-8 character sequences. The String type is most often used by GraphQL to represent free-form human-readable text.
+
+
+    Arguments:
+        input (DevelopmentClientInput): input
+        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+
+    Returns:
+        str"""
+    return execute(
+        CreateClientMutation, {"input": input}, rath=rath
+    ).create_developmental_client
 
 
 async def acreate_room(
@@ -238,7 +328,7 @@ async def acreate_room(
     Arguments:
         title (Optional[str], optional): title.
         description (Optional[str], optional): description.
-        rath (unlok_next.rath.UnlokRath, optional): The arkitekt rath client
+        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
         RoomFragment"""
@@ -263,7 +353,7 @@ def create_room(
     Arguments:
         title (Optional[str], optional): title.
         description (Optional[str], optional): description.
-        rath (unlok_next.rath.UnlokRath, optional): The arkitekt rath client
+        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
         RoomFragment"""
@@ -272,7 +362,7 @@ def create_room(
     ).create_room
 
 
-async def aget_room(id: str, rath: Optional[UnlokRath] = None) -> RoomFragment:
+async def aget_room(id: ID, rath: Optional[UnlokRath] = None) -> RoomFragment:
     """GetRoom
 
 
@@ -280,15 +370,15 @@ async def aget_room(id: str, rath: Optional[UnlokRath] = None) -> RoomFragment:
 
 
     Arguments:
-        id (str): id
-        rath (unlok_next.rath.UnlokRath, optional): The arkitekt rath client
+        id (ID): id
+        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
         RoomFragment"""
     return (await aexecute(GetRoomQuery, {"id": id}, rath=rath)).room
 
 
-def get_room(id: str, rath: Optional[UnlokRath] = None) -> RoomFragment:
+def get_room(id: ID, rath: Optional[UnlokRath] = None) -> RoomFragment:
     """GetRoom
 
 
@@ -296,8 +386,8 @@ def get_room(id: str, rath: Optional[UnlokRath] = None) -> RoomFragment:
 
 
     Arguments:
-        id (str): id
-        rath (unlok_next.rath.UnlokRath, optional): The arkitekt rath client
+        id (ID): id
+        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
         RoomFragment"""
@@ -305,16 +395,16 @@ def get_room(id: str, rath: Optional[UnlokRath] = None) -> RoomFragment:
 
 
 async def awatch_room(
-    room: str, agent_id: str, rath: Optional[UnlokRath] = None
+    room: ID, agent_id: ID, rath: Optional[UnlokRath] = None
 ) -> AsyncIterator[WatchRoomSubscriptionRoom]:
     """WatchRoom
 
 
 
     Arguments:
-        room (str): room
-        agent_id (str): agentId
-        rath (unlok_next.rath.UnlokRath, optional): The arkitekt rath client
+        room (ID): room
+        agent_id (ID): agentId
+        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
         WatchRoomSubscriptionRoom"""
@@ -325,16 +415,16 @@ async def awatch_room(
 
 
 def watch_room(
-    room: str, agent_id: str, rath: Optional[UnlokRath] = None
+    room: ID, agent_id: ID, rath: Optional[UnlokRath] = None
 ) -> Iterator[WatchRoomSubscriptionRoom]:
     """WatchRoom
 
 
 
     Arguments:
-        room (str): room
-        agent_id (str): agentId
-        rath (unlok_next.rath.UnlokRath, optional): The arkitekt rath client
+        room (ID): room
+        agent_id (ID): agentId
+        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
         WatchRoomSubscriptionRoom"""
@@ -342,3 +432,6 @@ def watch_room(
         WatchRoomSubscription, {"room": room, "agentId": agent_id}, rath=rath
     ):
         yield event.room
+
+
+DevelopmentClientInput.update_forward_refs()

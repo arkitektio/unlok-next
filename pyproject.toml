@@ -1,9 +1,9 @@
 [tool.poetry]
-name = "unlok"
-version = "0.1.61"
+name = "unlok-next"
+version = "0.1.62"
 description = ""
 authors = ["jhnnsrs <jhnnsrs@gmail.com>"]
-packages = [{ include = "unlok" }]
+packages = [{ include = "unlok_next" }]
 
 [tool.poetry.dependencies]
 python = "^3.8"
