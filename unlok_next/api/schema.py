@@ -1,9 +1,9 @@
-from unlok_next.rath import UnlokRath
-from unlok_next.funcs import execute, asubscribe, subscribe, aexecute
-from typing import AsyncIterator, Optional, Iterator, Literal, List, Tuple
+from unlok_next.funcs import aexecute, asubscribe, subscribe, execute
+from typing import Optional, Tuple, AsyncIterator, List, Literal, Iterator
 from rath.scalars import ID
-from enum import Enum
+from unlok_next.rath import UnlokRath
 from pydantic import Field, BaseModel
+from enum import Enum
 
 
 class StructureInput(BaseModel):
@@ -50,6 +50,19 @@ class Requirement(BaseModel):
     optional: bool
     description: Optional[str]
     key: str
+
+    class Config:
+        """A config class"""
+
+        frozen = True
+        extra = "forbid"
+        use_enum_values = True
+
+
+class CreateStreamInput(BaseModel):
+    room: ID
+    title: Optional[str]
+    agent_id: Optional[str] = Field(alias="agentId")
 
     class Config:
         """A config class"""
@@ -124,6 +137,19 @@ class ListMessageFragment(BaseModel):
         frozen = True
 
 
+class StreamFragment(BaseModel):
+    typename: Optional[Literal["Stream"]] = Field(alias="__typename", exclude=True)
+    id: ID
+    title: str
+    "The Title of the Stream"
+    token: str
+
+    class Config:
+        """A config class"""
+
+        frozen = True
+
+
 class RoomFragment(BaseModel):
     typename: Optional[Literal["Room"]] = Field(alias="__typename", exclude=True)
     id: ID
@@ -160,6 +186,16 @@ class CreateClientMutation(BaseModel):
 
     class Meta:
         document = "mutation CreateClient($input: DevelopmentClientInput!) {\n  createDevelopmentalClient(input: $input)\n}"
+
+
+class CreateStreamMutation(BaseModel):
+    create_stream: StreamFragment = Field(alias="createStream")
+
+    class Arguments(BaseModel):
+        input: CreateStreamInput
+
+    class Meta:
+        document = "fragment Stream on Stream {\n  id\n  title\n  token\n}\n\nmutation CreateStream($input: CreateStreamInput!) {\n  createStream(input: $input) {\n    ...Stream\n  }\n}"
 
 
 class CreateRoomMutation(BaseModel):
@@ -312,6 +348,44 @@ def create_client(
     return execute(
         CreateClientMutation, {"input": input}, rath=rath
     ).create_developmental_client
+
+
+async def acreate_stream(
+    input: CreateStreamInput, rath: Optional[UnlokRath] = None
+) -> StreamFragment:
+    """CreateStream
+
+
+     createStream: Stream(id, agent, title, token)
+
+
+    Arguments:
+        input (CreateStreamInput): input
+        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+
+    Returns:
+        StreamFragment"""
+    return (
+        await aexecute(CreateStreamMutation, {"input": input}, rath=rath)
+    ).create_stream
+
+
+def create_stream(
+    input: CreateStreamInput, rath: Optional[UnlokRath] = None
+) -> StreamFragment:
+    """CreateStream
+
+
+     createStream: Stream(id, agent, title, token)
+
+
+    Arguments:
+        input (CreateStreamInput): input
+        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+
+    Returns:
+        StreamFragment"""
+    return execute(CreateStreamMutation, {"input": input}, rath=rath).create_stream
 
 
 async def acreate_room(

@@ -1,5 +1,8 @@
 
 
+from arkitekt_next.model import Manifest
+
+
 def init_services(service_builder_registry):
     from .unlok import Unlok
     from .rath import UnlokLinkComposition, UnlokRath
@@ -20,7 +23,7 @@ def init_services(service_builder_registry):
         rath: UnlokRath
 
 
-    def build_arkitekt_unlok(fakts: Fakts, herre: Herre,  params: Params):
+    def build_arkitekt_unlok(fakts: Fakts, herre: Herre,  params: Params, manifest: Manifest):
         return ArkitektNextUnlok(
             rath=UnlokRath(
                 link=UnlokLinkComposition(
