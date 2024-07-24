@@ -1,9 +1,9 @@
-from unlok_next.funcs import aexecute, asubscribe, subscribe, execute
-from typing import Optional, Tuple, AsyncIterator, List, Literal, Iterator
+from unlok_next.funcs import execute, aexecute, subscribe, asubscribe
+from pydantic import Field, BaseModel
+from typing import Optional, Literal, AsyncIterator, Iterator, Tuple, List
+from enum import Enum
 from rath.scalars import ID
 from unlok_next.rath import UnlokRath
-from pydantic import Field, BaseModel
-from enum import Enum
 
 
 class StructureInput(BaseModel):
@@ -20,7 +20,7 @@ class StructureInput(BaseModel):
 
 class DevelopmentClientInput(BaseModel):
     manifest: "ManifestInput"
-    composition: Optional[ID]
+    composition: Optional[ID] = None
     requirements: Tuple["Requirement", ...]
 
     class Config:
@@ -34,7 +34,7 @@ class DevelopmentClientInput(BaseModel):
 class ManifestInput(BaseModel):
     identifier: str
     version: str
-    logo: Optional[str]
+    logo: Optional[str] = None
     scopes: Tuple[str, ...]
 
     class Config:
@@ -48,7 +48,7 @@ class ManifestInput(BaseModel):
 class Requirement(BaseModel):
     service: str
     optional: bool
-    description: Optional[str]
+    description: Optional[str] = None
     key: str
 
     class Config:
@@ -61,8 +61,8 @@ class Requirement(BaseModel):
 
 class CreateStreamInput(BaseModel):
     room: ID
-    title: Optional[str]
-    agent_id: Optional[str] = Field(alias="agentId")
+    title: Optional[str] = None
+    agent_id: Optional[str] = Field(alias="agentId", default=None)
 
     class Config:
         """A config class"""
@@ -72,7 +72,7 @@ class CreateStreamInput(BaseModel):
         use_enum_values = True
 
 
-class MessageFragmentAgentRoom(BaseModel):
+class MessageAgentRoom(BaseModel):
     """Room(id, title, description, creator)"""
 
     typename: Optional[Literal["Room"]] = Field(alias="__typename", exclude=True)
@@ -84,12 +84,12 @@ class MessageFragmentAgentRoom(BaseModel):
         frozen = True
 
 
-class MessageFragmentAgent(BaseModel):
+class MessageAgent(BaseModel):
     """Agent(id, room, name, app, user)"""
 
     typename: Optional[Literal["Agent"]] = Field(alias="__typename", exclude=True)
     id: ID
-    room: MessageFragmentAgentRoom
+    room: MessageAgentRoom
 
     class Config:
         """A config class"""
@@ -97,12 +97,12 @@ class MessageFragmentAgent(BaseModel):
         frozen = True
 
 
-class MessageFragment(BaseModel):
+class Message(BaseModel):
     typename: Optional[Literal["Message"]] = Field(alias="__typename", exclude=True)
     id: ID
     text: str
     "A clear text representation of the rich comment"
-    agent: MessageFragmentAgent
+    agent: MessageAgent
     "The user that created this comment"
 
     class Config:
@@ -111,7 +111,7 @@ class MessageFragment(BaseModel):
         frozen = True
 
 
-class ListMessageFragmentAgent(BaseModel):
+class ListMessageAgent(BaseModel):
     """Agent(id, room, name, app, user)"""
 
     typename: Optional[Literal["Agent"]] = Field(alias="__typename", exclude=True)
@@ -123,12 +123,12 @@ class ListMessageFragmentAgent(BaseModel):
         frozen = True
 
 
-class ListMessageFragment(BaseModel):
+class ListMessage(BaseModel):
     typename: Optional[Literal["Message"]] = Field(alias="__typename", exclude=True)
     id: ID
     text: str
     "A clear text representation of the rich comment"
-    agent: ListMessageFragmentAgent
+    agent: ListMessageAgent
     "The user that created this comment"
 
     class Config:
@@ -137,12 +137,39 @@ class ListMessageFragment(BaseModel):
         frozen = True
 
 
-class StreamFragment(BaseModel):
+class StreamAgentRoom(BaseModel):
+    """Room(id, title, description, creator)"""
+
+    typename: Optional[Literal["Room"]] = Field(alias="__typename", exclude=True)
+    id: ID
+
+    class Config:
+        """A config class"""
+
+        frozen = True
+
+
+class StreamAgent(BaseModel):
+    """Agent(id, room, name, app, user)"""
+
+    typename: Optional[Literal["Agent"]] = Field(alias="__typename", exclude=True)
+    id: ID
+    room: StreamAgentRoom
+
+    class Config:
+        """A config class"""
+
+        frozen = True
+
+
+class Stream(BaseModel):
     typename: Optional[Literal["Stream"]] = Field(alias="__typename", exclude=True)
     id: ID
     title: str
     "The Title of the Stream"
     token: str
+    agent: StreamAgent
+    "The agent that created this stream"
 
     class Config:
         """A config class"""
@@ -150,7 +177,7 @@ class StreamFragment(BaseModel):
         frozen = True
 
 
-class RoomFragment(BaseModel):
+class Room(BaseModel):
     typename: Optional[Literal["Room"]] = Field(alias="__typename", exclude=True)
     id: ID
     title: str
@@ -164,7 +191,7 @@ class RoomFragment(BaseModel):
 
 
 class SendMutation(BaseModel):
-    send: MessageFragment
+    send: Message
 
     class Arguments(BaseModel):
         text: str
@@ -189,17 +216,17 @@ class CreateClientMutation(BaseModel):
 
 
 class CreateStreamMutation(BaseModel):
-    create_stream: StreamFragment = Field(alias="createStream")
+    create_stream: Stream = Field(alias="createStream")
 
     class Arguments(BaseModel):
         input: CreateStreamInput
 
     class Meta:
-        document = "fragment Stream on Stream {\n  id\n  title\n  token\n}\n\nmutation CreateStream($input: CreateStreamInput!) {\n  createStream(input: $input) {\n    ...Stream\n  }\n}"
+        document = "fragment Stream on Stream {\n  id\n  title\n  token\n  agent {\n    id\n    room {\n      id\n    }\n  }\n}\n\nmutation CreateStream($input: CreateStreamInput!) {\n  createStream(input: $input) {\n    ...Stream\n  }\n}"
 
 
 class CreateRoomMutation(BaseModel):
-    create_room: RoomFragment = Field(alias="createRoom")
+    create_room: Room = Field(alias="createRoom")
 
     class Arguments(BaseModel):
         title: Optional[str] = Field(default=None)
@@ -209,8 +236,18 @@ class CreateRoomMutation(BaseModel):
         document = "fragment Room on Room {\n  id\n  title\n  description\n}\n\nmutation CreateRoom($title: String, $description: String) {\n  createRoom(input: {title: $title, description: $description}) {\n    ...Room\n  }\n}"
 
 
+class GetStreamQuery(BaseModel):
+    stream: Stream
+
+    class Arguments(BaseModel):
+        id: ID
+
+    class Meta:
+        document = "fragment Stream on Stream {\n  id\n  title\n  token\n  agent {\n    id\n    room {\n      id\n    }\n  }\n}\n\nquery GetStream($id: ID!) {\n  stream(id: $id) {\n    ...Stream\n  }\n}"
+
+
 class GetRoomQuery(BaseModel):
-    room: RoomFragment
+    room: Room
 
     class Arguments(BaseModel):
         id: ID
@@ -221,7 +258,7 @@ class GetRoomQuery(BaseModel):
 
 class WatchRoomSubscriptionRoom(BaseModel):
     typename: Optional[Literal["RoomEvent"]] = Field(alias="__typename", exclude=True)
-    message: Optional[ListMessageFragment]
+    message: Optional[ListMessage]
 
     class Config:
         """A config class"""
@@ -246,7 +283,7 @@ async def asend(
     agent_id: str,
     attach_structures: Optional[List[StructureInput]] = None,
     rath: Optional[UnlokRath] = None,
-) -> MessageFragment:
+) -> Message:
     """Send
 
 
@@ -261,7 +298,7 @@ async def asend(
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
-        MessageFragment"""
+        Message"""
     return (
         await aexecute(
             SendMutation,
@@ -282,7 +319,7 @@ def send(
     agent_id: str,
     attach_structures: Optional[List[StructureInput]] = None,
     rath: Optional[UnlokRath] = None,
-) -> MessageFragment:
+) -> Message:
     """Send
 
 
@@ -297,7 +334,7 @@ def send(
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
-        MessageFragment"""
+        Message"""
     return execute(
         SendMutation,
         {
@@ -352,7 +389,7 @@ def create_client(
 
 async def acreate_stream(
     input: CreateStreamInput, rath: Optional[UnlokRath] = None
-) -> StreamFragment:
+) -> Stream:
     """CreateStream
 
 
@@ -364,15 +401,13 @@ async def acreate_stream(
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
-        StreamFragment"""
+        Stream"""
     return (
         await aexecute(CreateStreamMutation, {"input": input}, rath=rath)
     ).create_stream
 
 
-def create_stream(
-    input: CreateStreamInput, rath: Optional[UnlokRath] = None
-) -> StreamFragment:
+def create_stream(input: CreateStreamInput, rath: Optional[UnlokRath] = None) -> Stream:
     """CreateStream
 
 
@@ -384,7 +419,7 @@ def create_stream(
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
-        StreamFragment"""
+        Stream"""
     return execute(CreateStreamMutation, {"input": input}, rath=rath).create_stream
 
 
@@ -392,7 +427,7 @@ async def acreate_room(
     title: Optional[str] = None,
     description: Optional[str] = None,
     rath: Optional[UnlokRath] = None,
-) -> RoomFragment:
+) -> Room:
     """CreateRoom
 
 
@@ -405,7 +440,7 @@ async def acreate_room(
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
-        RoomFragment"""
+        Room"""
     return (
         await aexecute(
             CreateRoomMutation, {"title": title, "description": description}, rath=rath
@@ -417,7 +452,7 @@ def create_room(
     title: Optional[str] = None,
     description: Optional[str] = None,
     rath: Optional[UnlokRath] = None,
-) -> RoomFragment:
+) -> Room:
     """CreateRoom
 
 
@@ -430,13 +465,45 @@ def create_room(
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
-        RoomFragment"""
+        Room"""
     return execute(
         CreateRoomMutation, {"title": title, "description": description}, rath=rath
     ).create_room
 
 
-async def aget_room(id: ID, rath: Optional[UnlokRath] = None) -> RoomFragment:
+async def aget_stream(id: ID, rath: Optional[UnlokRath] = None) -> Stream:
+    """GetStream
+
+
+     stream: Stream(id, agent, title, token)
+
+
+    Arguments:
+        id (ID): id
+        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+
+    Returns:
+        Stream"""
+    return (await aexecute(GetStreamQuery, {"id": id}, rath=rath)).stream
+
+
+def get_stream(id: ID, rath: Optional[UnlokRath] = None) -> Stream:
+    """GetStream
+
+
+     stream: Stream(id, agent, title, token)
+
+
+    Arguments:
+        id (ID): id
+        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+
+    Returns:
+        Stream"""
+    return execute(GetStreamQuery, {"id": id}, rath=rath).stream
+
+
+async def aget_room(id: ID, rath: Optional[UnlokRath] = None) -> Room:
     """GetRoom
 
 
@@ -448,11 +515,11 @@ async def aget_room(id: ID, rath: Optional[UnlokRath] = None) -> RoomFragment:
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
-        RoomFragment"""
+        Room"""
     return (await aexecute(GetRoomQuery, {"id": id}, rath=rath)).room
 
 
-def get_room(id: ID, rath: Optional[UnlokRath] = None) -> RoomFragment:
+def get_room(id: ID, rath: Optional[UnlokRath] = None) -> Room:
     """GetRoom
 
 
@@ -464,7 +531,7 @@ def get_room(id: ID, rath: Optional[UnlokRath] = None) -> RoomFragment:
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
-        RoomFragment"""
+        Room"""
     return execute(GetRoomQuery, {"id": id}, rath=rath).room
 
 
