@@ -1,5 +1,3 @@
-
-
 from arkitekt_next.model import Manifest
 
 
@@ -14,16 +12,15 @@ def init_services(service_builder_registry):
     from herre import Herre
     from fakts import Fakts
 
-
     from arkitekt_next.service_registry import Params
     from arkitekt_next.model import Requirement
-
 
     class ArkitektNextUnlok(Unlok):
         rath: UnlokRath
 
-
-    def build_arkitekt_unlok(fakts: Fakts, herre: Herre,  params: Params, manifest: Manifest):
+    def build_arkitekt_unlok(
+        fakts: Fakts, herre: Herre, params: Params, manifest: Manifest
+    ):
         return ArkitektNextUnlok(
             rath=UnlokRath(
                 link=UnlokLinkComposition(
@@ -37,9 +34,11 @@ def init_services(service_builder_registry):
             )
         )
 
-    
-        
-    service_builder_registry.register("unlok", build_arkitekt_unlok, Requirement(
+    service_builder_registry.register(
+        "unlok",
+        build_arkitekt_unlok,
+        Requirement(
             service="live.arkitekt.lok",
             description="An instance of ArkitektNext Lok to authenticate the user",
-        ))
+        ),
+    )

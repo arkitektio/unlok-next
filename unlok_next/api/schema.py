@@ -1,9 +1,9 @@
-from unlok_next.funcs import execute, aexecute, subscribe, asubscribe
-from pydantic import Field, BaseModel
-from typing import Optional, Literal, AsyncIterator, Iterator, Tuple, List
-from enum import Enum
-from rath.scalars import ID
+from typing import Iterator, Optional, AsyncIterator, Tuple, Literal, List
 from unlok_next.rath import UnlokRath
+from unlok_next.funcs import aexecute, subscribe, execute, asubscribe
+from pydantic import BaseModel, Field
+from rath.scalars import ID
+from enum import Enum
 
 
 class StructureInput(BaseModel):
