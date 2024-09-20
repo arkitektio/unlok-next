@@ -1,34 +1,22 @@
-from typing import Iterator, Optional, AsyncIterator, Tuple, Literal, List
-from unlok_next.rath import UnlokRath
-from unlok_next.funcs import aexecute, subscribe, execute, asubscribe
-from pydantic import BaseModel, Field
-from rath.scalars import ID
+from typing import Literal, Iterator, List, Tuple, Optional, AsyncIterator
+from unlok_next.funcs import subscribe, execute, asubscribe, aexecute
+from pydantic import ConfigDict, BaseModel, Field
 from enum import Enum
+from unlok_next.rath import UnlokRath
+from rath.scalars import ID
 
 
 class StructureInput(BaseModel):
     object: ID
     identifier: str
-
-    class Config:
-        """A config class"""
-
-        frozen = True
-        extra = "forbid"
-        use_enum_values = True
+    model_config = ConfigDict(frozen=True, extra="forbid", use_enum_values=True)
 
 
 class DevelopmentClientInput(BaseModel):
     manifest: "ManifestInput"
     composition: Optional[ID] = None
     requirements: Tuple["Requirement", ...]
-
-    class Config:
-        """A config class"""
-
-        frozen = True
-        extra = "forbid"
-        use_enum_values = True
+    model_config = ConfigDict(frozen=True, extra="forbid", use_enum_values=True)
 
 
 class ManifestInput(BaseModel):
@@ -36,13 +24,7 @@ class ManifestInput(BaseModel):
     version: str
     logo: Optional[str] = None
     scopes: Tuple[str, ...]
-
-    class Config:
-        """A config class"""
-
-        frozen = True
-        extra = "forbid"
-        use_enum_values = True
+    model_config = ConfigDict(frozen=True, extra="forbid", use_enum_values=True)
 
 
 class Requirement(BaseModel):
@@ -50,144 +32,114 @@ class Requirement(BaseModel):
     optional: bool
     description: Optional[str] = None
     key: str
-
-    class Config:
-        """A config class"""
-
-        frozen = True
-        extra = "forbid"
-        use_enum_values = True
+    model_config = ConfigDict(frozen=True, extra="forbid", use_enum_values=True)
 
 
 class CreateStreamInput(BaseModel):
     room: ID
     title: Optional[str] = None
     agent_id: Optional[str] = Field(alias="agentId", default=None)
-
-    class Config:
-        """A config class"""
-
-        frozen = True
-        extra = "forbid"
-        use_enum_values = True
+    model_config = ConfigDict(frozen=True, extra="forbid", use_enum_values=True)
 
 
 class MessageAgentRoom(BaseModel):
     """Room(id, title, description, creator)"""
 
-    typename: Optional[Literal["Room"]] = Field(alias="__typename", exclude=True)
+    typename: Optional[Literal["Room"]] = Field(
+        alias="__typename", default="Room", exclude=True
+    )
     id: ID
-
-    class Config:
-        """A config class"""
-
-        frozen = True
+    model_config = ConfigDict(frozen=True)
 
 
 class MessageAgent(BaseModel):
     """Agent(id, room, name, app, user)"""
 
-    typename: Optional[Literal["Agent"]] = Field(alias="__typename", exclude=True)
+    typename: Optional[Literal["Agent"]] = Field(
+        alias="__typename", default="Agent", exclude=True
+    )
     id: ID
     room: MessageAgentRoom
-
-    class Config:
-        """A config class"""
-
-        frozen = True
+    model_config = ConfigDict(frozen=True)
 
 
 class Message(BaseModel):
-    typename: Optional[Literal["Message"]] = Field(alias="__typename", exclude=True)
+    typename: Optional[Literal["Message"]] = Field(
+        alias="__typename", default="Message", exclude=True
+    )
     id: ID
     text: str
     "A clear text representation of the rich comment"
     agent: MessageAgent
     "The user that created this comment"
-
-    class Config:
-        """A config class"""
-
-        frozen = True
+    model_config = ConfigDict(frozen=True)
 
 
 class ListMessageAgent(BaseModel):
     """Agent(id, room, name, app, user)"""
 
-    typename: Optional[Literal["Agent"]] = Field(alias="__typename", exclude=True)
+    typename: Optional[Literal["Agent"]] = Field(
+        alias="__typename", default="Agent", exclude=True
+    )
     id: ID
-
-    class Config:
-        """A config class"""
-
-        frozen = True
+    model_config = ConfigDict(frozen=True)
 
 
 class ListMessage(BaseModel):
-    typename: Optional[Literal["Message"]] = Field(alias="__typename", exclude=True)
+    typename: Optional[Literal["Message"]] = Field(
+        alias="__typename", default="Message", exclude=True
+    )
     id: ID
     text: str
     "A clear text representation of the rich comment"
     agent: ListMessageAgent
     "The user that created this comment"
-
-    class Config:
-        """A config class"""
-
-        frozen = True
+    model_config = ConfigDict(frozen=True)
 
 
 class StreamAgentRoom(BaseModel):
     """Room(id, title, description, creator)"""
 
-    typename: Optional[Literal["Room"]] = Field(alias="__typename", exclude=True)
+    typename: Optional[Literal["Room"]] = Field(
+        alias="__typename", default="Room", exclude=True
+    )
     id: ID
-
-    class Config:
-        """A config class"""
-
-        frozen = True
+    model_config = ConfigDict(frozen=True)
 
 
 class StreamAgent(BaseModel):
     """Agent(id, room, name, app, user)"""
 
-    typename: Optional[Literal["Agent"]] = Field(alias="__typename", exclude=True)
+    typename: Optional[Literal["Agent"]] = Field(
+        alias="__typename", default="Agent", exclude=True
+    )
     id: ID
     room: StreamAgentRoom
-
-    class Config:
-        """A config class"""
-
-        frozen = True
+    model_config = ConfigDict(frozen=True)
 
 
 class Stream(BaseModel):
-    typename: Optional[Literal["Stream"]] = Field(alias="__typename", exclude=True)
+    typename: Optional[Literal["Stream"]] = Field(
+        alias="__typename", default="Stream", exclude=True
+    )
     id: ID
     title: str
     "The Title of the Stream"
     token: str
     agent: StreamAgent
     "The agent that created this stream"
-
-    class Config:
-        """A config class"""
-
-        frozen = True
+    model_config = ConfigDict(frozen=True)
 
 
 class Room(BaseModel):
-    typename: Optional[Literal["Room"]] = Field(alias="__typename", exclude=True)
+    typename: Optional[Literal["Room"]] = Field(
+        alias="__typename", default="Room", exclude=True
+    )
     id: ID
     title: str
     "The Title of the Room"
     description: str
-
-    class Config:
-        """A config class"""
-
-        frozen = True
+    model_config = ConfigDict(frozen=True)
 
 
 class SendMutation(BaseModel):
@@ -257,13 +209,11 @@ class GetRoomQuery(BaseModel):
 
 
 class WatchRoomSubscriptionRoom(BaseModel):
-    typename: Optional[Literal["RoomEvent"]] = Field(alias="__typename", exclude=True)
-    message: Optional[ListMessage]
-
-    class Config:
-        """A config class"""
-
-        frozen = True
+    typename: Optional[Literal["RoomEvent"]] = Field(
+        alias="__typename", default="RoomEvent", exclude=True
+    )
+    message: Optional[ListMessage] = Field(default=None)
+    model_config = ConfigDict(frozen=True)
 
 
 class WatchRoomSubscription(BaseModel):

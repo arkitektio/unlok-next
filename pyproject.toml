@@ -1,13 +1,13 @@
 [tool.poetry]
 name = "unlok-next"
-version = "0.1.71"
+version = "0.1.77"
 description = ""
 authors = ["jhnnsrs <jhnnsrs@gmail.com>"]
 packages = [{ include = "unlok_next" }]
 
 [tool.poetry.dependencies]
 python = "^3.8"
-rath = ">=0.4.6"
+rath = ">=1.0.0"
 
 [tool.poetry.group.dev.dependencies]
 testcontainers = "3.7.0"
@@ -17,8 +17,6 @@ PyQtWebEngine = "^5.15.5"
 PyQt5 = "^5.15.6"
 pytest-qt = "^4.2.0"
 pytest-asyncio = "^0.20.2"
-turms = { version = ">=0.2.3", python = "^3.9" }
-aiohttp = "^3.8.3"
 websockets = "^10.4"
 black = "^22.10.0"
 pytest-cov = "^4.0.0"

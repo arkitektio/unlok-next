@@ -1,20 +1,20 @@
 from arkitekt_next.model import Manifest
+from unlok_next.unlok import Unlok
+from unlok_next.rath import UnlokLinkComposition, UnlokRath
+from rath.links.split import SplitLink
+from rath.contrib.fakts.links.aiohttp import FaktsAIOHttpLink
+from rath.contrib.fakts.links.graphql_ws import FaktsGraphQLWSLink
+from rath.contrib.herre.links.auth import HerreAuthLink
+from graphql import OperationType
+from herre import Herre
+from fakts import Fakts
+
+from arkitekt_next.service_registry import Params
+from arkitekt_next.model import Requirement
 
 
 def init_services(service_builder_registry):
-    from .unlok import Unlok
-    from .rath import UnlokLinkComposition, UnlokRath
-    from rath.links.split import SplitLink
-    from rath.contrib.fakts.links.aiohttp import FaktsAIOHttpLink
-    from rath.contrib.fakts.links.graphql_ws import FaktsGraphQLWSLink
-    from rath.contrib.herre.links.auth import HerreAuthLink
-    from graphql import OperationType
-    from herre import Herre
-    from fakts import Fakts
-
-    from arkitekt_next.service_registry import Params
-    from arkitekt_next.model import Requirement
-
+    
     class ArkitektNextUnlok(Unlok):
         rath: UnlokRath
 
@@ -26,8 +26,12 @@ def init_services(service_builder_registry):
                 link=UnlokLinkComposition(
                     auth=HerreAuthLink(herre=herre),
                     split=SplitLink(
-                        left=FaktsAIOHttpLink(fakts_group="lok", fakts=fakts),
-                        right=FaktsGraphQLWSLink(fakts_group="lok", fakts=fakts),
+                        left=FaktsAIOHttpLink(
+                            fakts_group="lok", fakts=fakts, endpoint_url="FAKE_URL"
+                        ),
+                        right=FaktsGraphQLWSLink(
+                            fakts_group="lok", fakts=fakts, ws_endpoint_url="FAKE_URL"
+                        ),
                         split=lambda o: o.node.operation != OperationType.SUBSCRIPTION,
                     ),
                 )

@@ -28,7 +28,6 @@ class UnlokRath(rath.Rath):
     link: UnlokLinkComposition = Field(default_factory=UnlokLinkComposition)
 
     async def __aenter__(self):
-        print("UnlokRath.__aenter__")
         await super().__aenter__()
         current_unlok_next_rath.set(self)
         return self

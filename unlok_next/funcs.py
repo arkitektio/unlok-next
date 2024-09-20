@@ -12,13 +12,11 @@ def execute(operation, variables, rath: UnlokRath = None):
 
 
 async def aexecute(operation, variables, rath: UnlokRath = None):
-    print(operation, variables)
     rath = rath or current_unlok_next_rath.get()
 
     x = await rath.aquery(
         operation.Meta.document, operation.Arguments(**variables).dict(by_alias=True)
     )
-    print(x)
     return operation(**x.data)
 
 
