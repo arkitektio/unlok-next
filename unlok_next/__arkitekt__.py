@@ -1,4 +1,4 @@
-from arkitekt_next.model import Manifest
+from arkitekt_next.base_models import Manifest
 from unlok_next.unlok import Unlok
 from unlok_next.rath import UnlokLinkComposition, UnlokRath
 from rath.links.split import SplitLink
@@ -10,11 +10,11 @@ from herre import Herre
 from fakts import Fakts
 
 from arkitekt_next.service_registry import Params
-from arkitekt_next.model import Requirement
+from arkitekt_next.base_models import Requirement
 
 
 def init_services(service_builder_registry):
-    
+
     class ArkitektNextUnlok(Unlok):
         rath: UnlokRath
 

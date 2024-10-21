@@ -1,9 +1,9 @@
-from typing import Literal, Iterator, List, Tuple, Optional, AsyncIterator
-from unlok_next.funcs import subscribe, execute, asubscribe, aexecute
 from pydantic import ConfigDict, BaseModel, Field
-from enum import Enum
-from unlok_next.rath import UnlokRath
+from unlok_next.funcs import subscribe, asubscribe, execute, aexecute
 from rath.scalars import ID
+from typing import Literal, Optional, List, Tuple, Iterator, AsyncIterator
+from unlok_next.rath import UnlokRath
+from enum import Enum
 
 
 class StructureInput(BaseModel):
@@ -157,14 +157,45 @@ class SendMutation(BaseModel):
         document = "fragment Message on Message {\n  id\n  text\n  agent {\n    id\n    room {\n      id\n    }\n  }\n}\n\nmutation Send($text: String!, $room: ID!, $agentId: String!, $attachStructures: [StructureInput!]) {\n  send(\n    input: {text: $text, room: $room, agentId: $agentId, attachStructures: $attachStructures}\n  ) {\n    ...Message\n  }\n}"
 
 
+class CreateClientMutationCreatedevelopmentalclientOauth2client(BaseModel):
+    """Application(id, client_id, user, redirect_uris, post_logout_redirect_uris, client_type, authorization_grant_type, client_secret, name, skip_authorization, created, updated, algorithm)"""
+
+    typename: Optional[Literal["Oauth2Client"]] = Field(
+        alias="__typename", default="Oauth2Client", exclude=True
+    )
+    client_id: str = Field(alias="clientId")
+    model_config = ConfigDict(frozen=True)
+
+
+class CreateClientMutationCreatedevelopmentalclient(BaseModel):
+    """A client is a way of authenticating users with a release.
+    The strategy of authentication is defined by the kind of client. And allows for different authentication flow.
+    E.g a client can be a DESKTOP app, that might be used by multiple users, or a WEBSITE that wants to connect to a user's account,
+    but also a DEVELOPMENT client that is used by a developer to test the app. The client model thinly wraps the oauth2 client model, which is used to authenticate users.
+    """
+
+    typename: Optional[Literal["Client"]] = Field(
+        alias="__typename", default="Client", exclude=True
+    )
+    token: str
+    "The configuration of the client. This is the configuration that will be sent to the client. It should never contain sensitive information."
+    oauth2_client: CreateClientMutationCreatedevelopmentalclientOauth2client = Field(
+        alias="oauth2Client"
+    )
+    "The real oauth2 client that is used to authenticate users with this client."
+    model_config = ConfigDict(frozen=True)
+
+
 class CreateClientMutation(BaseModel):
-    create_developmental_client: str = Field(alias="createDevelopmentalClient")
+    create_developmental_client: CreateClientMutationCreatedevelopmentalclient = Field(
+        alias="createDevelopmentalClient"
+    )
 
     class Arguments(BaseModel):
         input: DevelopmentClientInput
 
     class Meta:
-        document = "mutation CreateClient($input: DevelopmentClientInput!) {\n  createDevelopmentalClient(input: $input)\n}"
+        document = "mutation CreateClient($input: DevelopmentClientInput!) {\n  createDevelopmentalClient(input: $input) {\n    token\n    oauth2Client {\n      clientId\n    }\n  }\n}"
 
 
 class CreateStreamMutation(BaseModel):
@@ -299,11 +330,14 @@ def send(
 
 async def acreate_client(
     input: DevelopmentClientInput, rath: Optional[UnlokRath] = None
-) -> str:
+) -> CreateClientMutationCreatedevelopmentalclient:
     """CreateClient
 
 
-     createDevelopmentalClient: The `String` scalar type represents textual data, represented as UTF-8 character sequences. The String type is most often used by GraphQL to represent free-form human-readable text.
+     createDevelopmentalClient: A client is a way of authenticating users with a release.
+     The strategy of authentication is defined by the kind of client. And allows for different authentication flow.
+     E.g a client can be a DESKTOP app, that might be used by multiple users, or a WEBSITE that wants to connect to a user's account,
+     but also a DEVELOPMENT client that is used by a developer to test the app. The client model thinly wraps the oauth2 client model, which is used to authenticate users.
 
 
     Arguments:
@@ -311,7 +345,7 @@ async def acreate_client(
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
-        str"""
+        CreateClientMutationCreatedevelopmentalclient"""
     return (
         await aexecute(CreateClientMutation, {"input": input}, rath=rath)
     ).create_developmental_client
@@ -319,11 +353,14 @@ async def acreate_client(
 
 def create_client(
     input: DevelopmentClientInput, rath: Optional[UnlokRath] = None
-) -> str:
+) -> CreateClientMutationCreatedevelopmentalclient:
     """CreateClient
 
 
-     createDevelopmentalClient: The `String` scalar type represents textual data, represented as UTF-8 character sequences. The String type is most often used by GraphQL to represent free-form human-readable text.
+     createDevelopmentalClient: A client is a way of authenticating users with a release.
+     The strategy of authentication is defined by the kind of client. And allows for different authentication flow.
+     E.g a client can be a DESKTOP app, that might be used by multiple users, or a WEBSITE that wants to connect to a user's account,
+     but also a DEVELOPMENT client that is used by a developer to test the app. The client model thinly wraps the oauth2 client model, which is used to authenticate users.
 
 
     Arguments:
@@ -331,7 +368,7 @@ def create_client(
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
-        str"""
+        CreateClientMutationCreatedevelopmentalclient"""
     return execute(
         CreateClientMutation, {"input": input}, rath=rath
     ).create_developmental_client
@@ -525,4 +562,4 @@ def watch_room(
         yield event.room
 
 
-DevelopmentClientInput.update_forward_refs()
+DevelopmentClientInput.model_rebuild()
