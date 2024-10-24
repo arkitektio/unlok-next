@@ -42,6 +42,7 @@ def init_services(service_builder_registry):
         "unlok",
         build_arkitekt_unlok,
         Requirement(
+            key="unlok",
             service="live.arkitekt.lok",
             description="An instance of ArkitektNext Lok to authenticate the user",
         ),
