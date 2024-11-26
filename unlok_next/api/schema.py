@@ -1,22 +1,26 @@
-from pydantic import Field, ConfigDict, BaseModel
-from unlok_next.funcs import execute, aexecute, asubscribe, subscribe
-from typing import Tuple, Iterator, List, Optional, Literal, AsyncIterator
-from rath.scalars import ID
 from unlok_next.rath import UnlokRath
+from typing import AsyncIterator, Tuple, Optional, Iterator, Literal, Iterable, List
+from pydantic import Field, ConfigDict, BaseModel
+from unlok_next.funcs import aexecute, asubscribe, execute, subscribe
+from rath.scalars import ID
 from enum import Enum
 
 
 class StructureInput(BaseModel):
     object: ID
     identifier: str
-    model_config = ConfigDict(frozen=True, extra="forbid", use_enum_values=True)
+    model_config = ConfigDict(
+        frozen=True, extra="forbid", populate_by_name=True, use_enum_values=True
+    )
 
 
 class DevelopmentClientInput(BaseModel):
     manifest: "ManifestInput"
     composition: Optional[ID] = None
     requirements: Tuple["Requirement", ...]
-    model_config = ConfigDict(frozen=True, extra="forbid", use_enum_values=True)
+    model_config = ConfigDict(
+        frozen=True, extra="forbid", populate_by_name=True, use_enum_values=True
+    )
 
 
 class ManifestInput(BaseModel):
@@ -24,7 +28,9 @@ class ManifestInput(BaseModel):
     version: str
     logo: Optional[str] = None
     scopes: Tuple[str, ...]
-    model_config = ConfigDict(frozen=True, extra="forbid", use_enum_values=True)
+    model_config = ConfigDict(
+        frozen=True, extra="forbid", populate_by_name=True, use_enum_values=True
+    )
 
 
 class Requirement(BaseModel):
@@ -32,14 +38,18 @@ class Requirement(BaseModel):
     optional: bool
     description: Optional[str] = None
     key: str
-    model_config = ConfigDict(frozen=True, extra="forbid", use_enum_values=True)
+    model_config = ConfigDict(
+        frozen=True, extra="forbid", populate_by_name=True, use_enum_values=True
+    )
 
 
 class CreateStreamInput(BaseModel):
     room: ID
     title: Optional[str] = None
     agent_id: Optional[str] = Field(alias="agentId", default=None)
-    model_config = ConfigDict(frozen=True, extra="forbid", use_enum_values=True)
+    model_config = ConfigDict(
+        frozen=True, extra="forbid", populate_by_name=True, use_enum_values=True
+    )
 
 
 class MessageAgentRoom(BaseModel):
@@ -62,6 +72,8 @@ class MessageAgent(BaseModel):
 
 
 class Message(BaseModel):
+    """Message represent the message of an agent on a room"""
+
     typename: Literal["Message"] = Field(
         alias="__typename", default="Message", exclude=True
     )
@@ -84,6 +96,8 @@ class ListMessageAgent(BaseModel):
 
 
 class ListMessage(BaseModel):
+    """Message represent the message of an agent on a room"""
+
     typename: Literal["Message"] = Field(
         alias="__typename", default="Message", exclude=True
     )
@@ -115,6 +129,8 @@ class StreamAgent(BaseModel):
 
 
 class Stream(BaseModel):
+    """Stream(id, agent, title, token)"""
+
     typename: Literal["Stream"] = Field(
         alias="__typename", default="Stream", exclude=True
     )
@@ -128,6 +144,8 @@ class Stream(BaseModel):
 
 
 class Room(BaseModel):
+    """Room(id, title, description, creator)"""
+
     typename: Literal["Room"] = Field(alias="__typename", default="Room", exclude=True)
     id: ID
     title: str
@@ -261,18 +279,15 @@ async def asend(
     """Send
 
 
-     send: Message represent the message of an agent on a room
-
-
     Arguments:
-        text (str): text
-        room (ID): room
-        agent_id (str): agentId
-        attach_structures (Optional[List[StructureInput]], optional): attachStructures.
+        text (str): No description
+        room (ID): No description
+        agent_id (str): No description
+        attach_structures (Optional[List[StructureInput]], optional): No description.
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
-        SendMutationSend"""
+        Message"""
     return (
         await aexecute(
             SendMutation,
@@ -297,18 +312,15 @@ def send(
     """Send
 
 
-     send: Message represent the message of an agent on a room
-
-
     Arguments:
-        text (str): text
-        room (ID): room
-        agent_id (str): agentId
-        attach_structures (Optional[List[StructureInput]], optional): attachStructures.
+        text (str): No description
+        room (ID): No description
+        agent_id (str): No description
+        attach_structures (Optional[List[StructureInput]], optional): No description.
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
-        SendMutationSend"""
+        Message"""
     return execute(
         SendMutation,
         {
@@ -322,85 +334,115 @@ def send(
 
 
 async def acreate_client(
-    input: DevelopmentClientInput, rath: Optional[UnlokRath] = None
+    manifest: ManifestInput,
+    requirements: Iterable[Requirement],
+    composition: Optional[ID] = None,
+    rath: Optional[UnlokRath] = None,
 ) -> CreateClientMutationCreatedevelopmentalclient:
     """CreateClient
 
 
-     createDevelopmentalClient: A client is a way of authenticating users with a release.
-     The strategy of authentication is defined by the kind of client. And allows for different authentication flow.
-     E.g a client can be a DESKTOP app, that might be used by multiple users, or a WEBSITE that wants to connect to a user's account,
-     but also a DEVELOPMENT client that is used by a developer to test the app. The client model thinly wraps the oauth2 client model, which is used to authenticate users.
-
-
     Arguments:
-        input (DevelopmentClientInput): input
+        manifest:  (required)
+        composition: The `ID` scalar type represents a unique identifier, often used to refetch an object or as key for a cache. The ID type appears in a JSON response as a String; however, it is not intended to be human-readable. When expected as an input type, any string (such as `"4"`) or integer (such as `4`) input value will be accepted as an ID.
+        requirements:  (required) (list) (required)
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
         CreateClientMutationCreatedevelopmentalclient"""
     return (
-        await aexecute(CreateClientMutation, {"input": input}, rath=rath)
+        await aexecute(
+            CreateClientMutation,
+            {
+                "input": {
+                    "manifest": manifest,
+                    "composition": composition,
+                    "requirements": requirements,
+                }
+            },
+            rath=rath,
+        )
     ).create_developmental_client
 
 
 def create_client(
-    input: DevelopmentClientInput, rath: Optional[UnlokRath] = None
+    manifest: ManifestInput,
+    requirements: Iterable[Requirement],
+    composition: Optional[ID] = None,
+    rath: Optional[UnlokRath] = None,
 ) -> CreateClientMutationCreatedevelopmentalclient:
     """CreateClient
 
 
-     createDevelopmentalClient: A client is a way of authenticating users with a release.
-     The strategy of authentication is defined by the kind of client. And allows for different authentication flow.
-     E.g a client can be a DESKTOP app, that might be used by multiple users, or a WEBSITE that wants to connect to a user's account,
-     but also a DEVELOPMENT client that is used by a developer to test the app. The client model thinly wraps the oauth2 client model, which is used to authenticate users.
-
-
     Arguments:
-        input (DevelopmentClientInput): input
+        manifest:  (required)
+        composition: The `ID` scalar type represents a unique identifier, often used to refetch an object or as key for a cache. The ID type appears in a JSON response as a String; however, it is not intended to be human-readable. When expected as an input type, any string (such as `"4"`) or integer (such as `4`) input value will be accepted as an ID.
+        requirements:  (required) (list) (required)
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
         CreateClientMutationCreatedevelopmentalclient"""
     return execute(
-        CreateClientMutation, {"input": input}, rath=rath
+        CreateClientMutation,
+        {
+            "input": {
+                "manifest": manifest,
+                "composition": composition,
+                "requirements": requirements,
+            }
+        },
+        rath=rath,
     ).create_developmental_client
 
 
 async def acreate_stream(
-    input: CreateStreamInput, rath: Optional[UnlokRath] = None
+    room: ID,
+    title: Optional[str] = None,
+    agent_id: Optional[str] = None,
+    rath: Optional[UnlokRath] = None,
 ) -> Stream:
     """CreateStream
 
 
-     createStream: Stream(id, agent, title, token)
-
-
     Arguments:
-        input (CreateStreamInput): input
+        room: The `ID` scalar type represents a unique identifier, often used to refetch an object or as key for a cache. The ID type appears in a JSON response as a String; however, it is not intended to be human-readable. When expected as an input type, any string (such as `"4"`) or integer (such as `4`) input value will be accepted as an ID. (required)
+        title: The `String` scalar type represents textual data, represented as UTF-8 character sequences. The String type is most often used by GraphQL to represent free-form human-readable text.
+        agent_id: The `String` scalar type represents textual data, represented as UTF-8 character sequences. The String type is most often used by GraphQL to represent free-form human-readable text.
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
-        CreateStreamMutationCreatestream"""
+        Stream"""
     return (
-        await aexecute(CreateStreamMutation, {"input": input}, rath=rath)
+        await aexecute(
+            CreateStreamMutation,
+            {"input": {"room": room, "title": title, "agent_id": agent_id}},
+            rath=rath,
+        )
     ).create_stream
 
 
-def create_stream(input: CreateStreamInput, rath: Optional[UnlokRath] = None) -> Stream:
+def create_stream(
+    room: ID,
+    title: Optional[str] = None,
+    agent_id: Optional[str] = None,
+    rath: Optional[UnlokRath] = None,
+) -> Stream:
     """CreateStream
 
 
-     createStream: Stream(id, agent, title, token)
-
-
     Arguments:
-        input (CreateStreamInput): input
+        room: The `ID` scalar type represents a unique identifier, often used to refetch an object or as key for a cache. The ID type appears in a JSON response as a String; however, it is not intended to be human-readable. When expected as an input type, any string (such as `"4"`) or integer (such as `4`) input value will be accepted as an ID. (required)
+        title: The `String` scalar type represents textual data, represented as UTF-8 character sequences. The String type is most often used by GraphQL to represent free-form human-readable text.
+        agent_id: The `String` scalar type represents textual data, represented as UTF-8 character sequences. The String type is most often used by GraphQL to represent free-form human-readable text.
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
-        CreateStreamMutationCreatestream"""
-    return execute(CreateStreamMutation, {"input": input}, rath=rath).create_stream
+        Stream"""
+    return execute(
+        CreateStreamMutation,
+        {"input": {"room": room, "title": title, "agent_id": agent_id}},
+        rath=rath,
+    ).create_stream
 
 
 async def acreate_room(
@@ -411,16 +453,13 @@ async def acreate_room(
     """CreateRoom
 
 
-     createRoom: Room(id, title, description, creator)
-
-
     Arguments:
-        title (Optional[str], optional): title.
-        description (Optional[str], optional): description.
+        title (Optional[str], optional): No description.
+        description (Optional[str], optional): No description.
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
-        CreateRoomMutationCreateroom"""
+        Room"""
     return (
         await aexecute(
             CreateRoomMutation, {"title": title, "description": description}, rath=rath
@@ -436,16 +475,13 @@ def create_room(
     """CreateRoom
 
 
-     createRoom: Room(id, title, description, creator)
-
-
     Arguments:
-        title (Optional[str], optional): title.
-        description (Optional[str], optional): description.
+        title (Optional[str], optional): No description.
+        description (Optional[str], optional): No description.
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
-        CreateRoomMutationCreateroom"""
+        Room"""
     return execute(
         CreateRoomMutation, {"title": title, "description": description}, rath=rath
     ).create_room
@@ -455,15 +491,12 @@ async def aget_stream(id: ID, rath: Optional[UnlokRath] = None) -> Stream:
     """GetStream
 
 
-     stream: Stream(id, agent, title, token)
-
-
     Arguments:
-        id (ID): id
+        id (ID): No description
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
-        GetStreamQueryStream"""
+        Stream"""
     return (await aexecute(GetStreamQuery, {"id": id}, rath=rath)).stream
 
 
@@ -471,15 +504,12 @@ def get_stream(id: ID, rath: Optional[UnlokRath] = None) -> Stream:
     """GetStream
 
 
-     stream: Stream(id, agent, title, token)
-
-
     Arguments:
-        id (ID): id
+        id (ID): No description
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
-        GetStreamQueryStream"""
+        Stream"""
     return execute(GetStreamQuery, {"id": id}, rath=rath).stream
 
 
@@ -487,15 +517,12 @@ async def aget_room(id: ID, rath: Optional[UnlokRath] = None) -> Room:
     """GetRoom
 
 
-     room: Room(id, title, description, creator)
-
-
     Arguments:
-        id (ID): id
+        id (ID): No description
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
-        GetRoomQueryRoom"""
+        Room"""
     return (await aexecute(GetRoomQuery, {"id": id}, rath=rath)).room
 
 
@@ -503,15 +530,12 @@ def get_room(id: ID, rath: Optional[UnlokRath] = None) -> Room:
     """GetRoom
 
 
-     room: Room(id, title, description, creator)
-
-
     Arguments:
-        id (ID): id
+        id (ID): No description
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
-        GetRoomQueryRoom"""
+        Room"""
     return execute(GetRoomQuery, {"id": id}, rath=rath).room
 
 
@@ -521,10 +545,9 @@ async def awatch_room(
     """WatchRoom
 
 
-
     Arguments:
-        room (ID): room
-        agent_id (ID): agentId
+        room (ID): No description
+        agent_id (ID): No description
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
@@ -541,10 +564,9 @@ def watch_room(
     """WatchRoom
 
 
-
     Arguments:
-        room (ID): room
-        agent_id (ID): agentId
+        room (ID): No description
+        agent_id (ID): No description
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
