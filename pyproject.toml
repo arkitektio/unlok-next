@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "unlok-next"
-version = "0.1.87"
+version = "0.1.88"
 description = ""
 authors = ["jhnnsrs <jhnnsrs@gmail.com>"]
 packages = [{ include = "unlok_next" }]

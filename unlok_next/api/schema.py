@@ -183,7 +183,8 @@ class CreateClientMutationCreatedevelopmentalclient(BaseModel):
     """A client is a way of authenticating users with a release.
     The strategy of authentication is defined by the kind of client. And allows for different authentication flow.
     E.g a client can be a DESKTOP app, that might be used by multiple users, or a WEBSITE that wants to connect to a user's account,
-    but also a DEVELOPMENT client that is used by a developer to test the app. The client model thinly wraps the oauth2 client model, which is used to authenticate users."""
+    but also a DEVELOPMENT client that is used by a developer to test the app. The client model thinly wraps the oauth2 client model, which is used to authenticate users.
+    """
 
     typename: Literal["Client"] = Field(
         alias="__typename", default="Client", exclude=True

@@ -25,10 +25,7 @@ from fakts_next import Fakts
 
 from arkitekt_next.base_models import Manifest
 
-from arkitekt_next.service_registry import (
-    Params,
-    BaseArkitektService
-)
+from arkitekt_next.service_registry import Params, BaseArkitektService
 from arkitekt_next.base_models import Requirement
 
 
@@ -42,11 +39,12 @@ def build_relative_path(*path: str) -> str:
 
 class LokService(BaseArkitektService):
 
-
     def get_service_name(self):
         return "unlok"
 
-    def build_service(self, fakts: Fakts, herre: Herre, params: Params, manifest: Manifest):
+    def build_service(
+        self, fakts: Fakts, herre: Herre, params: Params, manifest: Manifest
+    ):
         return ArkitektNextUnlok(
             rath=UnlokRath(
                 link=UnlokLinkComposition(
@@ -67,27 +65,22 @@ class LokService(BaseArkitektService):
     def get_requirements(self):
         return [
             Requirement(
-            key="unlok",
-            service="live.arkitekt.lok",
-            description="An instance of ArkitektNext Lok to authenticate the user",
-        ),
+                key="unlok",
+                service="live.arkitekt.lok",
+                description="An instance of ArkitektNext Lok to authenticate the user",
+            ),
         ]
 
     def get_graphql_schema(self):
         schema_graphql_path = build_relative_path("api", "schema.graphql")
         with open(schema_graphql_path) as f:
             return f.read()
-        
+
     def get_turms_project(self):
         turms_prject = build_relative_path("api", "project.json")
         with open(turms_prject) as f:
             return json.loads(f.read())
 
 
-
-
 def build_services():
     return [LokService()]
-
-
-
