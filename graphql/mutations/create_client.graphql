@@ -1,8 +1,0 @@
-mutation CreateClient($input: DevelopmentClientInput!) {
-  createDevelopmentalClient(input: $input) {
-    token
-    oauth2Client {
-      clientId
-    }
-  }
-}

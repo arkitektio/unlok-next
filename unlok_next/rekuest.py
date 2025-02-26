@@ -1,9 +1,9 @@
 
 from rekuest_next.structures.default import (
-    PortScope,
     id_shrink,
     get_default_structure_registry
 )
+from rekuest_next.api.schema import PortScope
 from rekuest_next.widgets import SearchWidget
 from unlok_next.api.schema import (
     Room,
