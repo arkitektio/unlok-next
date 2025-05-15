@@ -10,27 +10,13 @@ from graphql import OperationType
 from herre_next import Herre
 from fakts_next import Fakts
 
-from arkitekt_next.service_registry import Params
+from arkitekt_next.service_registry import (
+    BaseArkitektService,
+    Params,
+    get_default_service_registry,
+)
 from arkitekt_next.base_models import Requirement
 import os
-from fluss_next.fluss import Fluss
-from fluss_next.rath import FlussLinkComposition, FlussRath
-from rath.links.split import SplitLink
-from fakts_next.contrib.rath.aiohttp import FaktsAIOHttpLink
-from fakts_next.contrib.rath.graphql_ws import FaktsGraphQLWSLink
-from herre_next.contrib.rath.auth_link import HerreAuthLink
-from graphql import OperationType
-from herre_next import Herre
-from fakts_next import Fakts
-
-from arkitekt_next.base_models import Manifest
-
-from arkitekt_next.service_registry import Params, BaseArkitektService, get_default_service_registry
-from arkitekt_next.base_models import Requirement
-
-
-class ArkitektNextUnlok(Unlok):
-    rath: UnlokRath
 
 
 def build_relative_path(*path: str) -> str:
@@ -38,14 +24,13 @@ def build_relative_path(*path: str) -> str:
 
 
 class UnlokService(BaseArkitektService):
-
     def get_service_name(self):
         return "unlok"
 
     def build_service(
         self, fakts: Fakts, herre: Herre, params: Params, manifest: Manifest
     ):
-        return ArkitektNextUnlok(
+        return Unlok(
             rath=UnlokRath(
                 link=UnlokLinkComposition(
                     auth=HerreAuthLink(herre=herre),

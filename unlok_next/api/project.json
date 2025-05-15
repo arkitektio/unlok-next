@@ -25,7 +25,12 @@
                 "uuid": "str",
                 "Callback": "str",
                 "Any": "typing.Any",
-                "ID": "rath.scalars.ID"
+                "ID": "rath.scalars.ID",
+                "Version": "str",
+                "AppIdentifier": "str",
+                "UnsafeChild": "typing.Any",
+                "ServiceIdentifier": "str",
+                "Identifier": "str"
             },
             "freeze": {
                 "enabled": true,
@@ -40,6 +45,7 @@
                 "include_fields": [],
                 "convert_list_to_tuple": true
             },
+            "create_catchall": true,
             "options": {
                 "enabled": true,
                 "extra": "forbid",

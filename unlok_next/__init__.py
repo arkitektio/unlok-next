@@ -1,4 +1,5 @@
 from .unlok import Unlok
+
 try:
     from .arkitekt import UnlokService
 except ImportError:
@@ -8,4 +9,4 @@ try:
 except ImportError:
     pass
 
-__all__ = ["Unlok", "structure_reg"]
+__all__ = ["Unlok", "structure_reg", "UnlokService"]

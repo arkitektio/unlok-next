@@ -1,0 +1,163 @@
+apps: []
+db:
+  db_name: lok
+  dependency: db
+  engine: django.db.backends.postgresql
+  host: db
+  password: hello_django
+  port: 5432
+  username: hello_django
+deployment:
+  name: default
+django:
+  admin:
+    email: admin@admin.com
+    password: admin
+    username: admin
+  debug: true
+  hosts:
+    - "*"
+  secret_key: c5d84589433e1d0b4198072c54ee0dd1
+force_script_name: ""
+my_script_name: ""
+groups:
+  - description: admin_group
+    name: admin
+  - description: The linz anatomy group
+    name: linz-iac
+  - description: The UC2 group
+    name: uc2
+livekit:
+  api_key: devkey
+  api_secret: secret
+  api_url: http://livekit:7880
+lok:
+  static_tokens:
+    test:
+      sub: 1
+      iss: lok
+  issuer: lok
+  key_type: RS256
+  public_key: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDXx/g7dyiwmfIQvkBKvUAM+KBuL1KdvZfZMlYhbyrz9Auk2xao1gLYiQJ183joiXadUreL4BugUrasQVdR9JvBWXOBeqm2FD5Ehf9VvqXdzCOQ7/fUXkb9N8sqmz5YitQuheKGDh0weNmVcfdsCGU38sACEvFQg+5dv1tqLbm7EllT+vogntDVX16DmvpvFEX4HYHpT8qM/xuqSB6yQ8+wBuQd3K7WTFgUrUqQx6zFrSMUbSArPrrY5Z0GJAeDAHKp4+V+um4mSHpYM2nBJ5pn80wYpsf97KIL9P+UJzjb/indB8dCqpPkAk3HogBhj67Tp5JoqCMoaXHFU3tiYQCp
+private_key: "-----BEGIN PRIVATE KEY-----
+
+  MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQDXx/g7dyiwmfIQ
+
+  vkBKvUAM+KBuL1KdvZfZMlYhbyrz9Auk2xao1gLYiQJ183joiXadUreL4BugUras
+
+  QVdR9JvBWXOBeqm2FD5Ehf9VvqXdzCOQ7/fUXkb9N8sqmz5YitQuheKGDh0weNmV
+
+  cfdsCGU38sACEvFQg+5dv1tqLbm7EllT+vogntDVX16DmvpvFEX4HYHpT8qM/xuq
+
+  SB6yQ8+wBuQd3K7WTFgUrUqQx6zFrSMUbSArPrrY5Z0GJAeDAHKp4+V+um4mSHpY
+
+  M2nBJ5pn80wYpsf97KIL9P+UJzjb/indB8dCqpPkAk3HogBhj67Tp5JoqCMoaXHF
+
+  U3tiYQCpAgMBAAECggEAFfZyEydlOlho9YBPzeumTcuulJh3ebu27XH8p0mH3y27
+
+  U6vDCitCPeTwHa5K46w+KPQm33NPjIlus2ixKRPTGKJwqcCg7nnv/ox++Sy++CzT
+
+  f+iU2oZABnz7zlnfxiZXQ2b4L/nWyby7NMVVUCcomkG4fl2MN0w+YkdcWBnQWjRr
+
+  j+KcG029zrhKI2uiXz2IysRPRAw58lWcvDO9H5q4eo9+qxV7UzbCvipOsjGFH6RJ
+
+  IwUyCz3XFOdC84taz2+xT0umJeG4RGDdiL0ZM1BC89BqFtQiOJntqaV6FgczKRTH
+
+  TcMuiYndX8QsZZ+zUZ2LjFRNi8u1TBkgczitBg0bQwKBgQDrMAe0xhCGP4n3zZoc
+
+  2Dlz8XFc2XvhCfFdkfE6zzbva2444LQ2uRcbPG1m419z138SsnNN2hw1JAermMj3
+
+  bcjMW2zsas2wkhTaLDkceHC1qFa55+TdkCNx5Min6n1Wnfr40j8Wvum9YstseuGk
+
+  BQIlbMz0ImGnU3QQRg7kesAf/wKBgQDq4E11mR4gqKxmW4RWT9cJ+DM285APaGXf
+
+  85fyjaVs1eVvZ5krY5vmemAOLk9v8F73Sn64zEtJVCQzD5YwihjmQ4dS+hn7f3j1
+
+  cY1Fw+2hJJHi8o63uPtRmLV/Cc787F2iMqi/YK36f4sJX8h63CBYYPf7buN7+T9t
+
+  4T3w0MnfVwKBgBUl03uQ18mKixhqN3Jiiv/+9OeZcscwgrCcP+m+2jy7F0UsB2ho
+
+  SkibrWa0CVA8T2PaAf49H44zuDDY4zFEgOrHScsUa3x2FkPr+BK0TcY35dx/mpfF
+
+  rzo9jUF0F2Mjf37CQQQFlLT/3jTZ89Iw1RmSZ/eH4+oM2gHgmtQ2qXH3AoGBAL9U
+
+  HIUxR9N+04FGB5Vv0FI0tzOKUM3cUzCNdDeHnzv7Obz4fVNU/whOo7SpkNg0zIdR
+
+  Tc0nziRbwGk/xy6fMA1S8Qds6IFwo439BAHSyt47tgNTZ2LN8xvS8/YafVyXBuc7
+
+  sS7EiLTH9PCb7+n1KvwTca6F9BVnQn41v4lN60RdAoGBAMwdn2xRp+Ywc8N9dvn8
+
+  S0ozU3Vk2qbV5altixspOoWzuyFi1o/r5bgma71QjAsgvWwPhBTOsByrmEhrvWpu
+
+  DDpLWRIGuAg5dG21Ddh8ZMaJhISmbvepUhm2fVLG3YzG0eE/KGJjX6AFGqLUOi1V
+
+  qv9UsZQ7iutdI3MsfEU9PWEL
+
+  -----END PRIVATE KEY-----
+
+  "
+public_key: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDXx/g7dyiwmfIQvkBKvUAM+KBuL1KdvZfZMlYhbyrz9Auk2xao1gLYiQJ183joiXadUreL4BugUrasQVdR9JvBWXOBeqm2FD5Ehf9VvqXdzCOQ7/fUXkb9N8sqmz5YitQuheKGDh0weNmVcfdsCGU38sACEvFQg+5dv1tqLbm7EllT+vogntDVX16DmvpvFEX4HYHpT8qM/xuqSB6yQ8+wBuQd3K7WTFgUrUqQx6zFrSMUbSArPrrY5Z0GJAeDAHKp4+V+um4mSHpYM2nBJ5pn80wYpsf97KIL9P+UJzjb/indB8dCqpPkAk3HogBhj67Tp5JoqCMoaXHFU3tiYQCp
+redeem_tokens:
+  - token: Y22joLbkjm4vtXMj_T4FD3U99Mb71pTFnUe-8KToAQI
+    user: admin
+redis:
+  dependency: redis
+  host: redis
+  port: 6379
+scopes:
+  kabinet_add_repo: Add repositories to the database
+  kabinet_deploy: Deploy containers
+  mikro_read: Read image from the database
+  mikro_write: Write image to the database
+  openid: The open id connect scope
+  read: A generic read access
+  read_image: Read image from the database
+  rekuest_agent: Act as an agent
+  rekuest_call: Call other apps with rekuest
+  write: A generic write access
+token_expire_seconds: 700000
+users:
+  - name: Johannes Roos
+    username: jhnnsrs
+    password: mysecret-name
+    groups: [iac-linz, uc2]
+  - name: Benedict Diederich
+    username: beniroquai
+    password: my-other-name
+    groups: [uc2]
+ensured_layers:
+  - kind: tailscale
+    identifier: jhnnsrs-tailscale
+ensured_instances:
+  mikro_base:
+    builder: arkitekt.relpath
+    service: arkitekt.live.mikro
+    limited_to_groups:
+      - uc2
+    layer: web
+    params:
+      path: "mikro"
+  fluss_base:
+    builder: arkitekt.relpath
+    service: arkitekt.live.fluss
+    limited_to_users:
+      - jhnnsrs
+    layer: web
+    params:
+      path: "fluss"
+  kraph_base:
+    builder: arkitekt.relpath
+    service: arkitekt.live.mikro
+    layer: web
+    params:
+      path: "kraph"
+s3:
+  access_key: ZvBLOQAApECKXISSJyiox192s6RNhVgmN9LZhWFYbdA
+  buckets:
+    media: sleazy-tan-seahorse
+  dependency: minio
+  host: minio
+  name: lanky-green-dalmatian
+  port: 9000
+  protocol: http
+  secret_key: rqh27SKddiMciJ2RPSpQF3l_SYtlXNKCA9Fp3NgrYBQ

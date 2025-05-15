@@ -1,0 +1,54 @@
+fragment ServiceInstance on ServiceInstance {
+  id
+  backend
+  identifier
+  service {
+    identifier
+    id
+    description
+    name
+  }
+
+  allowedUsers {
+    ...ListUser
+  }
+  deniedUsers {
+    ...ListUser
+  }
+  allowedGroups {
+    ...ListGroup
+  }
+  deniedGroups {
+    ...ListGroup
+  }
+  userDefinitions {
+    ...ListUserDefinedServiceInstance
+  }
+  mappings {
+    ...ListServiceInstanceMapping
+  }
+
+  layer {
+    id
+    name
+  }
+  logo {
+    presignedUrl
+  }
+}
+
+fragment ListServiceInstance on ServiceInstance {
+  id
+  backend
+  identifier
+  allowedUsers {
+    ...ListUser
+  }
+  deniedUsers {
+    ...ListUser
+  }
+  layer {
+    id
+    name
+  }
+}
