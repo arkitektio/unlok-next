@@ -32,10 +32,10 @@ class UnlokService(BaseArkitektService):
                     auth=FaktsAuthLink(fakts=fakts),
                     split=SplitLink(
                         left=FaktsAIOHttpLink(
-                            fakts_group="lok", fakts=fakts, endpoint_url="FAKE_URL"
+                            fakts_group="unlok", fakts=fakts, endpoint_url="FAKE_URL"
                         ),
                         right=FaktsGraphQLWSLink(
-                            fakts_group="lok", fakts=fakts, ws_endpoint_url="FAKE_URL"
+                            fakts_group="unlok", fakts=fakts, ws_endpoint_url="FAKE_URL"
                         ),
                         split=lambda o: o.node.operation != OperationType.SUBSCRIPTION,
                     ),
