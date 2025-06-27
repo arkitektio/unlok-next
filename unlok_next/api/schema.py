@@ -1,21 +1,21 @@
-from unlok_next.rath import UnlokRath
-from pydantic import BaseModel, Field, ConfigDict
+from enum import Enum
+from datetime import datetime
+from pydantic import ConfigDict, BaseModel, Field
 from typing import (
+    Iterable,
+    Optional,
     Literal,
     Annotated,
-    Tuple,
-    Any,
-    Optional,
     AsyncIterator,
-    Iterable,
-    Iterator,
     List,
     Union,
+    Any,
+    Tuple,
+    Iterator,
 )
-from datetime import datetime
-from unlok_next.funcs import subscribe, asubscribe, aexecute, execute
 from rath.scalars import ID
-from enum import Enum
+from unlok_next.funcs import subscribe, asubscribe, aexecute, execute
+from unlok_next.rath import UnlokRath
 
 
 class DescendantKind(str, Enum):
@@ -203,6 +203,42 @@ class DescendantInput(BaseModel):
     italic: Optional[bool] = None
     code: Optional[bool] = None
     text: Optional[str] = None
+    model_config = ConfigDict(
+        frozen=True, extra="forbid", populate_by_name=True, use_enum_values=True
+    )
+
+
+class DevelopmentClientInput(BaseModel):
+    """No documentation"""
+
+    manifest: "ManifestInput"
+    composition: Optional[ID] = None
+    requirements: Tuple["Requirement", ...]
+    layers: Optional[Tuple[str, ...]] = None
+    model_config = ConfigDict(
+        frozen=True, extra="forbid", populate_by_name=True, use_enum_values=True
+    )
+
+
+class ManifestInput(BaseModel):
+    """No documentation"""
+
+    identifier: str
+    version: str
+    logo: Optional[str] = None
+    scopes: Tuple[str, ...]
+    model_config = ConfigDict(
+        frozen=True, extra="forbid", populate_by_name=True, use_enum_values=True
+    )
+
+
+class Requirement(BaseModel):
+    """No documentation"""
+
+    service: str
+    optional: bool
+    description: Optional[str] = None
+    key: str
     model_config = ConfigDict(
         frozen=True, extra="forbid", populate_by_name=True, use_enum_values=True
     )
@@ -1827,7 +1863,7 @@ class UpdateServiceInstanceMutation(BaseModel):
     class Meta:
         """Meta class for UpdateServiceInstance"""
 
-        document = "fragment ListServiceInstance on ServiceInstance {\n  id\n  identifier\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  __typename\n}\n\nfragment ListClient on Client {\n  id\n  user {\n    id\n    username\n    __typename\n  }\n  name\n  kind\n  release {\n    version\n    logo {\n      presignedUrl\n      __typename\n    }\n    app {\n      id\n      identifier\n      logo {\n        presignedUrl\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment ListGroup on Group {\n  id\n  name\n  profile {\n    id\n    bio\n    avatar {\n      presignedUrl\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment ListUser on User {\n  username\n  firstName\n  lastName\n  email\n  avatar\n  id\n  __typename\n}\n\nfragment ListServiceInstanceMapping on ServiceInstanceMapping {\n  id\n  key\n  instance {\n    ...ListServiceInstance\n    __typename\n  }\n  client {\n    ...ListClient\n    __typename\n  }\n  optional\n  __typename\n}\n\nfragment ServiceInstance on ServiceInstance {\n  id\n  identifier\n  service {\n    identifier\n    id\n    description\n    name\n    __typename\n  }\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  allowedGroups {\n    ...ListGroup\n    __typename\n  }\n  deniedGroups {\n    ...ListGroup\n    __typename\n  }\n  mappings {\n    ...ListServiceInstanceMapping\n    __typename\n  }\n  logo {\n    presignedUrl\n    __typename\n  }\n  __typename\n}\n\nmutation UpdateServiceInstance($input: UpdateServiceInstanceInput!) {\n  updateServiceInstance(input: $input) {\n    ...ServiceInstance\n    __typename\n  }\n}"
+        document = "fragment ListClient on Client {\n  id\n  user {\n    id\n    username\n    __typename\n  }\n  name\n  kind\n  release {\n    version\n    logo {\n      presignedUrl\n      __typename\n    }\n    app {\n      id\n      identifier\n      logo {\n        presignedUrl\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment ListServiceInstance on ServiceInstance {\n  id\n  identifier\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  __typename\n}\n\nfragment ListUser on User {\n  username\n  firstName\n  lastName\n  email\n  avatar\n  id\n  __typename\n}\n\nfragment ListServiceInstanceMapping on ServiceInstanceMapping {\n  id\n  key\n  instance {\n    ...ListServiceInstance\n    __typename\n  }\n  client {\n    ...ListClient\n    __typename\n  }\n  optional\n  __typename\n}\n\nfragment ListGroup on Group {\n  id\n  name\n  profile {\n    id\n    bio\n    avatar {\n      presignedUrl\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment ServiceInstance on ServiceInstance {\n  id\n  identifier\n  service {\n    identifier\n    id\n    description\n    name\n    __typename\n  }\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  allowedGroups {\n    ...ListGroup\n    __typename\n  }\n  deniedGroups {\n    ...ListGroup\n    __typename\n  }\n  mappings {\n    ...ListServiceInstanceMapping\n    __typename\n  }\n  logo {\n    presignedUrl\n    __typename\n  }\n  __typename\n}\n\nmutation UpdateServiceInstance($input: UpdateServiceInstanceInput!) {\n  updateServiceInstance(input: $input) {\n    ...ServiceInstance\n    __typename\n  }\n}"
 
 
 class CreateServiceInstanceMutation(BaseModel):
@@ -1844,7 +1880,7 @@ class CreateServiceInstanceMutation(BaseModel):
     class Meta:
         """Meta class for CreateServiceInstance"""
 
-        document = "fragment ListServiceInstance on ServiceInstance {\n  id\n  identifier\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  __typename\n}\n\nfragment ListClient on Client {\n  id\n  user {\n    id\n    username\n    __typename\n  }\n  name\n  kind\n  release {\n    version\n    logo {\n      presignedUrl\n      __typename\n    }\n    app {\n      id\n      identifier\n      logo {\n        presignedUrl\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment ListGroup on Group {\n  id\n  name\n  profile {\n    id\n    bio\n    avatar {\n      presignedUrl\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment ListUser on User {\n  username\n  firstName\n  lastName\n  email\n  avatar\n  id\n  __typename\n}\n\nfragment ListServiceInstanceMapping on ServiceInstanceMapping {\n  id\n  key\n  instance {\n    ...ListServiceInstance\n    __typename\n  }\n  client {\n    ...ListClient\n    __typename\n  }\n  optional\n  __typename\n}\n\nfragment ServiceInstance on ServiceInstance {\n  id\n  identifier\n  service {\n    identifier\n    id\n    description\n    name\n    __typename\n  }\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  allowedGroups {\n    ...ListGroup\n    __typename\n  }\n  deniedGroups {\n    ...ListGroup\n    __typename\n  }\n  mappings {\n    ...ListServiceInstanceMapping\n    __typename\n  }\n  logo {\n    presignedUrl\n    __typename\n  }\n  __typename\n}\n\nmutation CreateServiceInstance($input: CreateServiceInstanceInput!) {\n  createServiceInstance(input: $input) {\n    ...ServiceInstance\n    __typename\n  }\n}"
+        document = "fragment ListClient on Client {\n  id\n  user {\n    id\n    username\n    __typename\n  }\n  name\n  kind\n  release {\n    version\n    logo {\n      presignedUrl\n      __typename\n    }\n    app {\n      id\n      identifier\n      logo {\n        presignedUrl\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment ListServiceInstance on ServiceInstance {\n  id\n  identifier\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  __typename\n}\n\nfragment ListUser on User {\n  username\n  firstName\n  lastName\n  email\n  avatar\n  id\n  __typename\n}\n\nfragment ListServiceInstanceMapping on ServiceInstanceMapping {\n  id\n  key\n  instance {\n    ...ListServiceInstance\n    __typename\n  }\n  client {\n    ...ListClient\n    __typename\n  }\n  optional\n  __typename\n}\n\nfragment ListGroup on Group {\n  id\n  name\n  profile {\n    id\n    bio\n    avatar {\n      presignedUrl\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment ServiceInstance on ServiceInstance {\n  id\n  identifier\n  service {\n    identifier\n    id\n    description\n    name\n    __typename\n  }\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  allowedGroups {\n    ...ListGroup\n    __typename\n  }\n  deniedGroups {\n    ...ListGroup\n    __typename\n  }\n  mappings {\n    ...ListServiceInstanceMapping\n    __typename\n  }\n  logo {\n    presignedUrl\n    __typename\n  }\n  __typename\n}\n\nmutation CreateServiceInstance($input: CreateServiceInstanceInput!) {\n  createServiceInstance(input: $input) {\n    ...ServiceInstance\n    __typename\n  }\n}"
 
 
 class RequestMediaUploadMutation(BaseModel):
@@ -1882,7 +1918,7 @@ class CreateCommentMutation(BaseModel):
     class Meta:
         """Meta class for CreateComment"""
 
-        document = "fragment Leaf on LeafDescendant {\n  bold\n  italic\n  code\n  text\n  __typename\n}\n\nfragment Mention on MentionDescendant {\n  user {\n    ...CommentUser\n    __typename\n  }\n  __typename\n}\n\nfragment Paragraph on ParagraphDescendant {\n  size\n  __typename\n}\n\nfragment CommentUser on User {\n  id\n  username\n  avatar\n  profile {\n    avatar {\n      presignedUrl\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment SubthreadComment on Comment {\n  user {\n    ...CommentUser\n    __typename\n  }\n  parent {\n    id\n    __typename\n  }\n  createdAt\n  descendants {\n    ...Descendant\n    __typename\n  }\n  __typename\n}\n\nfragment Descendant on Descendant {\n  kind\n  children {\n    kind\n    children {\n      kind\n      unsafeChildren\n      ...Leaf\n      ...Mention\n      ...Paragraph\n      __typename\n    }\n    ...Leaf\n    ...Mention\n    ...Paragraph\n    __typename\n  }\n  ...Mention\n  ...Paragraph\n  ...Leaf\n  __typename\n}\n\nfragment ListComment on Comment {\n  user {\n    ...CommentUser\n    __typename\n  }\n  parent {\n    id\n    __typename\n  }\n  descendants {\n    ...Descendant\n    __typename\n  }\n  resolved\n  resolvedBy {\n    ...CommentUser\n    __typename\n  }\n  id\n  createdAt\n  children {\n    ...SubthreadComment\n    __typename\n  }\n  __typename\n}\n\nmutation CreateComment($object: ID!, $identifier: Identifier!, $descendants: [DescendantInput!]!, $parent: ID) {\n  createComment(\n    input: {object: $object, identifier: $identifier, descendants: $descendants, parent: $parent}\n  ) {\n    ...ListComment\n    __typename\n  }\n}"
+        document = "fragment Mention on MentionDescendant {\n  user {\n    ...CommentUser\n    __typename\n  }\n  __typename\n}\n\nfragment Leaf on LeafDescendant {\n  bold\n  italic\n  code\n  text\n  __typename\n}\n\nfragment Paragraph on ParagraphDescendant {\n  size\n  __typename\n}\n\nfragment CommentUser on User {\n  id\n  username\n  avatar\n  profile {\n    avatar {\n      presignedUrl\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment SubthreadComment on Comment {\n  user {\n    ...CommentUser\n    __typename\n  }\n  parent {\n    id\n    __typename\n  }\n  createdAt\n  descendants {\n    ...Descendant\n    __typename\n  }\n  __typename\n}\n\nfragment Descendant on Descendant {\n  kind\n  children {\n    kind\n    children {\n      kind\n      unsafeChildren\n      ...Leaf\n      ...Mention\n      ...Paragraph\n      __typename\n    }\n    ...Leaf\n    ...Mention\n    ...Paragraph\n    __typename\n  }\n  ...Mention\n  ...Paragraph\n  ...Leaf\n  __typename\n}\n\nfragment ListComment on Comment {\n  user {\n    ...CommentUser\n    __typename\n  }\n  parent {\n    id\n    __typename\n  }\n  descendants {\n    ...Descendant\n    __typename\n  }\n  resolved\n  resolvedBy {\n    ...CommentUser\n    __typename\n  }\n  id\n  createdAt\n  children {\n    ...SubthreadComment\n    __typename\n  }\n  __typename\n}\n\nmutation CreateComment($object: ID!, $identifier: Identifier!, $descendants: [DescendantInput!]!, $parent: ID) {\n  createComment(\n    input: {object: $object, identifier: $identifier, descendants: $descendants, parent: $parent}\n  ) {\n    ...ListComment\n    __typename\n  }\n}"
 
 
 class ReplyToMutation(BaseModel):
@@ -1900,7 +1936,7 @@ class ReplyToMutation(BaseModel):
     class Meta:
         """Meta class for ReplyTo"""
 
-        document = "fragment Leaf on LeafDescendant {\n  bold\n  italic\n  code\n  text\n  __typename\n}\n\nfragment Mention on MentionDescendant {\n  user {\n    ...CommentUser\n    __typename\n  }\n  __typename\n}\n\nfragment Paragraph on ParagraphDescendant {\n  size\n  __typename\n}\n\nfragment CommentUser on User {\n  id\n  username\n  avatar\n  profile {\n    avatar {\n      presignedUrl\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment SubthreadComment on Comment {\n  user {\n    ...CommentUser\n    __typename\n  }\n  parent {\n    id\n    __typename\n  }\n  createdAt\n  descendants {\n    ...Descendant\n    __typename\n  }\n  __typename\n}\n\nfragment Descendant on Descendant {\n  kind\n  children {\n    kind\n    children {\n      kind\n      unsafeChildren\n      ...Leaf\n      ...Mention\n      ...Paragraph\n      __typename\n    }\n    ...Leaf\n    ...Mention\n    ...Paragraph\n    __typename\n  }\n  ...Mention\n  ...Paragraph\n  ...Leaf\n  __typename\n}\n\nfragment ListComment on Comment {\n  user {\n    ...CommentUser\n    __typename\n  }\n  parent {\n    id\n    __typename\n  }\n  descendants {\n    ...Descendant\n    __typename\n  }\n  resolved\n  resolvedBy {\n    ...CommentUser\n    __typename\n  }\n  id\n  createdAt\n  children {\n    ...SubthreadComment\n    __typename\n  }\n  __typename\n}\n\nmutation ReplyTo($descendants: [DescendantInput!]!, $parent: ID!) {\n  replyTo(input: {descendants: $descendants, parent: $parent}) {\n    ...ListComment\n    __typename\n  }\n}"
+        document = "fragment Mention on MentionDescendant {\n  user {\n    ...CommentUser\n    __typename\n  }\n  __typename\n}\n\nfragment Leaf on LeafDescendant {\n  bold\n  italic\n  code\n  text\n  __typename\n}\n\nfragment Paragraph on ParagraphDescendant {\n  size\n  __typename\n}\n\nfragment CommentUser on User {\n  id\n  username\n  avatar\n  profile {\n    avatar {\n      presignedUrl\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment SubthreadComment on Comment {\n  user {\n    ...CommentUser\n    __typename\n  }\n  parent {\n    id\n    __typename\n  }\n  createdAt\n  descendants {\n    ...Descendant\n    __typename\n  }\n  __typename\n}\n\nfragment Descendant on Descendant {\n  kind\n  children {\n    kind\n    children {\n      kind\n      unsafeChildren\n      ...Leaf\n      ...Mention\n      ...Paragraph\n      __typename\n    }\n    ...Leaf\n    ...Mention\n    ...Paragraph\n    __typename\n  }\n  ...Mention\n  ...Paragraph\n  ...Leaf\n  __typename\n}\n\nfragment ListComment on Comment {\n  user {\n    ...CommentUser\n    __typename\n  }\n  parent {\n    id\n    __typename\n  }\n  descendants {\n    ...Descendant\n    __typename\n  }\n  resolved\n  resolvedBy {\n    ...CommentUser\n    __typename\n  }\n  id\n  createdAt\n  children {\n    ...SubthreadComment\n    __typename\n  }\n  __typename\n}\n\nmutation ReplyTo($descendants: [DescendantInput!]!, $parent: ID!) {\n  replyTo(input: {descendants: $descendants, parent: $parent}) {\n    ...ListComment\n    __typename\n  }\n}"
 
 
 class ResolveCommentMutation(BaseModel):
@@ -1917,43 +1953,24 @@ class ResolveCommentMutation(BaseModel):
     class Meta:
         """Meta class for ResolveComment"""
 
-        document = "fragment Leaf on LeafDescendant {\n  bold\n  italic\n  code\n  text\n  __typename\n}\n\nfragment Mention on MentionDescendant {\n  user {\n    ...CommentUser\n    __typename\n  }\n  __typename\n}\n\nfragment Paragraph on ParagraphDescendant {\n  size\n  __typename\n}\n\nfragment CommentUser on User {\n  id\n  username\n  avatar\n  profile {\n    avatar {\n      presignedUrl\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment SubthreadComment on Comment {\n  user {\n    ...CommentUser\n    __typename\n  }\n  parent {\n    id\n    __typename\n  }\n  createdAt\n  descendants {\n    ...Descendant\n    __typename\n  }\n  __typename\n}\n\nfragment Descendant on Descendant {\n  kind\n  children {\n    kind\n    children {\n      kind\n      unsafeChildren\n      ...Leaf\n      ...Mention\n      ...Paragraph\n      __typename\n    }\n    ...Leaf\n    ...Mention\n    ...Paragraph\n    __typename\n  }\n  ...Mention\n  ...Paragraph\n  ...Leaf\n  __typename\n}\n\nfragment ListComment on Comment {\n  user {\n    ...CommentUser\n    __typename\n  }\n  parent {\n    id\n    __typename\n  }\n  descendants {\n    ...Descendant\n    __typename\n  }\n  resolved\n  resolvedBy {\n    ...CommentUser\n    __typename\n  }\n  id\n  createdAt\n  children {\n    ...SubthreadComment\n    __typename\n  }\n  __typename\n}\n\nmutation ResolveComment($id: ID!) {\n  resolveComment(input: {id: $id}) {\n    ...ListComment\n    __typename\n  }\n}"
-
-
-class CreateClientMutationCreatedevelopmentalclient(BaseModel):
-    """A client is a way of authenticating users with a release.
-    The strategy of authentication is defined by the kind of client. And allows for different authentication flow.
-    E.g a client can be a DESKTOP app, that might be used by multiple users, or a WEBSITE that wants to connect to a user's account,
-    but also a DEVELOPMENT client that is used by a developer to test the app. The client model thinly wraps the oauth2 client model, which is used to authenticate users.
-    """
-
-    typename: Literal["Client"] = Field(
-        alias="__typename", default="Client", exclude=True
-    )
-    id: ID
-    model_config = ConfigDict(frozen=True)
+        document = "fragment Mention on MentionDescendant {\n  user {\n    ...CommentUser\n    __typename\n  }\n  __typename\n}\n\nfragment Leaf on LeafDescendant {\n  bold\n  italic\n  code\n  text\n  __typename\n}\n\nfragment Paragraph on ParagraphDescendant {\n  size\n  __typename\n}\n\nfragment CommentUser on User {\n  id\n  username\n  avatar\n  profile {\n    avatar {\n      presignedUrl\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment SubthreadComment on Comment {\n  user {\n    ...CommentUser\n    __typename\n  }\n  parent {\n    id\n    __typename\n  }\n  createdAt\n  descendants {\n    ...Descendant\n    __typename\n  }\n  __typename\n}\n\nfragment Descendant on Descendant {\n  kind\n  children {\n    kind\n    children {\n      kind\n      unsafeChildren\n      ...Leaf\n      ...Mention\n      ...Paragraph\n      __typename\n    }\n    ...Leaf\n    ...Mention\n    ...Paragraph\n    __typename\n  }\n  ...Mention\n  ...Paragraph\n  ...Leaf\n  __typename\n}\n\nfragment ListComment on Comment {\n  user {\n    ...CommentUser\n    __typename\n  }\n  parent {\n    id\n    __typename\n  }\n  descendants {\n    ...Descendant\n    __typename\n  }\n  resolved\n  resolvedBy {\n    ...CommentUser\n    __typename\n  }\n  id\n  createdAt\n  children {\n    ...SubthreadComment\n    __typename\n  }\n  __typename\n}\n\nmutation ResolveComment($id: ID!) {\n  resolveComment(input: {id: $id}) {\n    ...ListComment\n    __typename\n  }\n}"
 
 
 class CreateClientMutation(BaseModel):
     """No documentation found for this operation."""
 
-    create_developmental_client: CreateClientMutationCreatedevelopmentalclient = Field(
-        alias="createDevelopmentalClient"
-    )
+    create_developmental_client: DetailClient = Field(alias="createDevelopmentalClient")
 
     class Arguments(BaseModel):
         """Arguments for CreateClient"""
 
-        identifier: str
-        version: str
-        scopes: List[str]
-        logo: Optional[str] = Field(default=None)
+        input: DevelopmentClientInput
         model_config = ConfigDict(populate_by_name=True)
 
     class Meta:
         """Meta class for CreateClient"""
 
-        document = "mutation CreateClient($identifier: String!, $version: String!, $scopes: [String!]!, $logo: String) {\n  createDevelopmentalClient(\n    input: {manifest: {identifier: $identifier, version: $version, scopes: $scopes, logo: $logo}}\n  ) {\n    id\n    __typename\n  }\n}"
+        document = "fragment ListUser on User {\n  username\n  firstName\n  lastName\n  email\n  avatar\n  id\n  __typename\n}\n\nfragment ListClient on Client {\n  id\n  user {\n    id\n    username\n    __typename\n  }\n  name\n  kind\n  release {\n    version\n    logo {\n      presignedUrl\n      __typename\n    }\n    app {\n      id\n      identifier\n      logo {\n        presignedUrl\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment ListApp on App {\n  id\n  identifier\n  logo {\n    presignedUrl\n    __typename\n  }\n  __typename\n}\n\nfragment ListServiceInstance on ServiceInstance {\n  id\n  identifier\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  __typename\n}\n\nfragment ListServiceInstanceMapping on ServiceInstanceMapping {\n  id\n  key\n  instance {\n    ...ListServiceInstance\n    __typename\n  }\n  client {\n    ...ListClient\n    __typename\n  }\n  optional\n  __typename\n}\n\nfragment ListRelease on Release {\n  id\n  version\n  logo {\n    presignedUrl\n    __typename\n  }\n  app {\n    ...ListApp\n    __typename\n  }\n  __typename\n}\n\nfragment DetailClient on Client {\n  id\n  token\n  name\n  user {\n    id\n    username\n    __typename\n  }\n  kind\n  release {\n    ...ListRelease\n    __typename\n  }\n  logo {\n    presignedUrl\n    __typename\n  }\n  oauth2Client {\n    clientId\n    __typename\n  }\n  mappings {\n    ...ListServiceInstanceMapping\n    __typename\n  }\n  __typename\n}\n\nmutation CreateClient($input: DevelopmentClientInput!) {\n  createDevelopmentalClient(input: $input) {\n    ...DetailClient\n    __typename\n  }\n}"
 
 
 class CreateGroupProfileMutation(BaseModel):
@@ -2040,7 +2057,7 @@ class CreateStashMutation(BaseModel):
     class Meta:
         """Meta class for CreateStash"""
 
-        document = 'fragment Stash on Stash {\n  id\n  name\n  description\n  createdAt\n  updatedAt\n  owner {\n    id\n    username\n    __typename\n  }\n  __typename\n}\n\nfragment StashItem on StashItem {\n  id\n  identifier\n  object\n  __typename\n}\n\nfragment ListStash on Stash {\n  ...Stash\n  items {\n    ...StashItem\n    __typename\n  }\n  __typename\n}\n\nmutation CreateStash($name: String, $description: String = "") {\n  createStash(input: {name: $name, description: $description}) {\n    ...ListStash\n    __typename\n  }\n}'
+        document = 'fragment StashItem on StashItem {\n  id\n  identifier\n  object\n  __typename\n}\n\nfragment Stash on Stash {\n  id\n  name\n  description\n  createdAt\n  updatedAt\n  owner {\n    id\n    username\n    __typename\n  }\n  __typename\n}\n\nfragment ListStash on Stash {\n  ...Stash\n  items {\n    ...StashItem\n    __typename\n  }\n  __typename\n}\n\nmutation CreateStash($name: String, $description: String = "") {\n  createStash(input: {name: $name, description: $description}) {\n    ...ListStash\n    __typename\n  }\n}'
 
 
 class AddItemsToStashMutation(BaseModel):
@@ -2129,7 +2146,7 @@ class GetServiceInstanceQuery(BaseModel):
     class Meta:
         """Meta class for GetServiceInstance"""
 
-        document = "fragment ListServiceInstance on ServiceInstance {\n  id\n  identifier\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  __typename\n}\n\nfragment ListClient on Client {\n  id\n  user {\n    id\n    username\n    __typename\n  }\n  name\n  kind\n  release {\n    version\n    logo {\n      presignedUrl\n      __typename\n    }\n    app {\n      id\n      identifier\n      logo {\n        presignedUrl\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment ListGroup on Group {\n  id\n  name\n  profile {\n    id\n    bio\n    avatar {\n      presignedUrl\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment ListUser on User {\n  username\n  firstName\n  lastName\n  email\n  avatar\n  id\n  __typename\n}\n\nfragment ListServiceInstanceMapping on ServiceInstanceMapping {\n  id\n  key\n  instance {\n    ...ListServiceInstance\n    __typename\n  }\n  client {\n    ...ListClient\n    __typename\n  }\n  optional\n  __typename\n}\n\nfragment ServiceInstance on ServiceInstance {\n  id\n  identifier\n  service {\n    identifier\n    id\n    description\n    name\n    __typename\n  }\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  allowedGroups {\n    ...ListGroup\n    __typename\n  }\n  deniedGroups {\n    ...ListGroup\n    __typename\n  }\n  mappings {\n    ...ListServiceInstanceMapping\n    __typename\n  }\n  logo {\n    presignedUrl\n    __typename\n  }\n  __typename\n}\n\nquery GetServiceInstance($id: ID!) {\n  serviceInstance(id: $id) {\n    ...ServiceInstance\n    __typename\n  }\n}"
+        document = "fragment ListClient on Client {\n  id\n  user {\n    id\n    username\n    __typename\n  }\n  name\n  kind\n  release {\n    version\n    logo {\n      presignedUrl\n      __typename\n    }\n    app {\n      id\n      identifier\n      logo {\n        presignedUrl\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment ListServiceInstance on ServiceInstance {\n  id\n  identifier\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  __typename\n}\n\nfragment ListUser on User {\n  username\n  firstName\n  lastName\n  email\n  avatar\n  id\n  __typename\n}\n\nfragment ListServiceInstanceMapping on ServiceInstanceMapping {\n  id\n  key\n  instance {\n    ...ListServiceInstance\n    __typename\n  }\n  client {\n    ...ListClient\n    __typename\n  }\n  optional\n  __typename\n}\n\nfragment ListGroup on Group {\n  id\n  name\n  profile {\n    id\n    bio\n    avatar {\n      presignedUrl\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment ServiceInstance on ServiceInstance {\n  id\n  identifier\n  service {\n    identifier\n    id\n    description\n    name\n    __typename\n  }\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  allowedGroups {\n    ...ListGroup\n    __typename\n  }\n  deniedGroups {\n    ...ListGroup\n    __typename\n  }\n  mappings {\n    ...ListServiceInstanceMapping\n    __typename\n  }\n  logo {\n    presignedUrl\n    __typename\n  }\n  __typename\n}\n\nquery GetServiceInstance($id: ID!) {\n  serviceInstance(id: $id) {\n    ...ServiceInstance\n    __typename\n  }\n}"
 
 
 class ListServicesQuery(BaseModel):
@@ -2273,7 +2290,7 @@ class GlobalSearchQuery(BaseModel):
     class Meta:
         """Meta class for GlobalSearch"""
 
-        document = "fragment ListGroup on Group {\n  id\n  name\n  profile {\n    id\n    bio\n    avatar {\n      presignedUrl\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment ListUser on User {\n  username\n  firstName\n  lastName\n  email\n  avatar\n  id\n  __typename\n}\n\nquery GlobalSearch($search: String, $noUsers: Boolean!, $noGroups: Boolean!, $pagination: OffsetPaginationInput) {\n  users: users(filters: {search: $search}, pagination: $pagination) @skip(if: $noUsers) {\n    ...ListUser\n    __typename\n  }\n  groups: groups(filters: {search: $search}, pagination: $pagination) @skip(if: $noGroups) {\n    ...ListGroup\n    __typename\n  }\n}"
+        document = "fragment ListUser on User {\n  username\n  firstName\n  lastName\n  email\n  avatar\n  id\n  __typename\n}\n\nfragment ListGroup on Group {\n  id\n  name\n  profile {\n    id\n    bio\n    avatar {\n      presignedUrl\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nquery GlobalSearch($search: String, $noUsers: Boolean!, $noGroups: Boolean!, $pagination: OffsetPaginationInput) {\n  users: users(filters: {search: $search}, pagination: $pagination) @skip(if: $noUsers) {\n    ...ListUser\n    __typename\n  }\n  groups: groups(filters: {search: $search}, pagination: $pagination) @skip(if: $noGroups) {\n    ...ListGroup\n    __typename\n  }\n}"
 
 
 class AppsQuery(BaseModel):
@@ -2362,7 +2379,7 @@ class DetailClientQuery(BaseModel):
     class Meta:
         """Meta class for DetailClient"""
 
-        document = "fragment ListUser on User {\n  username\n  firstName\n  lastName\n  email\n  avatar\n  id\n  __typename\n}\n\nfragment ListApp on App {\n  id\n  identifier\n  logo {\n    presignedUrl\n    __typename\n  }\n  __typename\n}\n\nfragment ListServiceInstance on ServiceInstance {\n  id\n  identifier\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  __typename\n}\n\nfragment ListClient on Client {\n  id\n  user {\n    id\n    username\n    __typename\n  }\n  name\n  kind\n  release {\n    version\n    logo {\n      presignedUrl\n      __typename\n    }\n    app {\n      id\n      identifier\n      logo {\n        presignedUrl\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment ListRelease on Release {\n  id\n  version\n  logo {\n    presignedUrl\n    __typename\n  }\n  app {\n    ...ListApp\n    __typename\n  }\n  __typename\n}\n\nfragment ListServiceInstanceMapping on ServiceInstanceMapping {\n  id\n  key\n  instance {\n    ...ListServiceInstance\n    __typename\n  }\n  client {\n    ...ListClient\n    __typename\n  }\n  optional\n  __typename\n}\n\nfragment DetailClient on Client {\n  id\n  token\n  name\n  user {\n    id\n    username\n    __typename\n  }\n  kind\n  release {\n    ...ListRelease\n    __typename\n  }\n  logo {\n    presignedUrl\n    __typename\n  }\n  oauth2Client {\n    clientId\n    __typename\n  }\n  mappings {\n    ...ListServiceInstanceMapping\n    __typename\n  }\n  __typename\n}\n\nquery DetailClient($id: ID!) {\n  client(id: $id) {\n    ...DetailClient\n    __typename\n  }\n}"
+        document = "fragment ListUser on User {\n  username\n  firstName\n  lastName\n  email\n  avatar\n  id\n  __typename\n}\n\nfragment ListClient on Client {\n  id\n  user {\n    id\n    username\n    __typename\n  }\n  name\n  kind\n  release {\n    version\n    logo {\n      presignedUrl\n      __typename\n    }\n    app {\n      id\n      identifier\n      logo {\n        presignedUrl\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment ListApp on App {\n  id\n  identifier\n  logo {\n    presignedUrl\n    __typename\n  }\n  __typename\n}\n\nfragment ListServiceInstance on ServiceInstance {\n  id\n  identifier\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  __typename\n}\n\nfragment ListServiceInstanceMapping on ServiceInstanceMapping {\n  id\n  key\n  instance {\n    ...ListServiceInstance\n    __typename\n  }\n  client {\n    ...ListClient\n    __typename\n  }\n  optional\n  __typename\n}\n\nfragment ListRelease on Release {\n  id\n  version\n  logo {\n    presignedUrl\n    __typename\n  }\n  app {\n    ...ListApp\n    __typename\n  }\n  __typename\n}\n\nfragment DetailClient on Client {\n  id\n  token\n  name\n  user {\n    id\n    username\n    __typename\n  }\n  kind\n  release {\n    ...ListRelease\n    __typename\n  }\n  logo {\n    presignedUrl\n    __typename\n  }\n  oauth2Client {\n    clientId\n    __typename\n  }\n  mappings {\n    ...ListServiceInstanceMapping\n    __typename\n  }\n  __typename\n}\n\nquery DetailClient($id: ID!) {\n  client(id: $id) {\n    ...DetailClient\n    __typename\n  }\n}"
 
 
 class MyManagedClientsQuery(BaseModel):
@@ -2396,7 +2413,7 @@ class ClientQuery(BaseModel):
     class Meta:
         """Meta class for Client"""
 
-        document = "fragment ListUser on User {\n  username\n  firstName\n  lastName\n  email\n  avatar\n  id\n  __typename\n}\n\nfragment ListApp on App {\n  id\n  identifier\n  logo {\n    presignedUrl\n    __typename\n  }\n  __typename\n}\n\nfragment ListServiceInstance on ServiceInstance {\n  id\n  identifier\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  __typename\n}\n\nfragment ListClient on Client {\n  id\n  user {\n    id\n    username\n    __typename\n  }\n  name\n  kind\n  release {\n    version\n    logo {\n      presignedUrl\n      __typename\n    }\n    app {\n      id\n      identifier\n      logo {\n        presignedUrl\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment ListRelease on Release {\n  id\n  version\n  logo {\n    presignedUrl\n    __typename\n  }\n  app {\n    ...ListApp\n    __typename\n  }\n  __typename\n}\n\nfragment ListServiceInstanceMapping on ServiceInstanceMapping {\n  id\n  key\n  instance {\n    ...ListServiceInstance\n    __typename\n  }\n  client {\n    ...ListClient\n    __typename\n  }\n  optional\n  __typename\n}\n\nfragment DetailClient on Client {\n  id\n  token\n  name\n  user {\n    id\n    username\n    __typename\n  }\n  kind\n  release {\n    ...ListRelease\n    __typename\n  }\n  logo {\n    presignedUrl\n    __typename\n  }\n  oauth2Client {\n    clientId\n    __typename\n  }\n  mappings {\n    ...ListServiceInstanceMapping\n    __typename\n  }\n  __typename\n}\n\nquery Client($clientId: ID!) {\n  client(clientId: $clientId) {\n    ...DetailClient\n    __typename\n  }\n}"
+        document = "fragment ListUser on User {\n  username\n  firstName\n  lastName\n  email\n  avatar\n  id\n  __typename\n}\n\nfragment ListClient on Client {\n  id\n  user {\n    id\n    username\n    __typename\n  }\n  name\n  kind\n  release {\n    version\n    logo {\n      presignedUrl\n      __typename\n    }\n    app {\n      id\n      identifier\n      logo {\n        presignedUrl\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment ListApp on App {\n  id\n  identifier\n  logo {\n    presignedUrl\n    __typename\n  }\n  __typename\n}\n\nfragment ListServiceInstance on ServiceInstance {\n  id\n  identifier\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  __typename\n}\n\nfragment ListServiceInstanceMapping on ServiceInstanceMapping {\n  id\n  key\n  instance {\n    ...ListServiceInstance\n    __typename\n  }\n  client {\n    ...ListClient\n    __typename\n  }\n  optional\n  __typename\n}\n\nfragment ListRelease on Release {\n  id\n  version\n  logo {\n    presignedUrl\n    __typename\n  }\n  app {\n    ...ListApp\n    __typename\n  }\n  __typename\n}\n\nfragment DetailClient on Client {\n  id\n  token\n  name\n  user {\n    id\n    username\n    __typename\n  }\n  kind\n  release {\n    ...ListRelease\n    __typename\n  }\n  logo {\n    presignedUrl\n    __typename\n  }\n  oauth2Client {\n    clientId\n    __typename\n  }\n  mappings {\n    ...ListServiceInstanceMapping\n    __typename\n  }\n  __typename\n}\n\nquery Client($clientId: ID!) {\n  client(clientId: $clientId) {\n    ...DetailClient\n    __typename\n  }\n}"
 
 
 class ScopesQueryScopes(BaseModel):
@@ -2558,7 +2575,7 @@ class MyStashesQuery(BaseModel):
     class Meta:
         """Meta class for MyStashes"""
 
-        document = "fragment Stash on Stash {\n  id\n  name\n  description\n  createdAt\n  updatedAt\n  owner {\n    id\n    username\n    __typename\n  }\n  __typename\n}\n\nfragment StashItem on StashItem {\n  id\n  identifier\n  object\n  __typename\n}\n\nfragment ListStash on Stash {\n  ...Stash\n  items {\n    ...StashItem\n    __typename\n  }\n  __typename\n}\n\nquery MyStashes($pagination: OffsetPaginationInput) {\n  stashes(pagination: $pagination) {\n    ...ListStash\n    __typename\n  }\n}"
+        document = "fragment StashItem on StashItem {\n  id\n  identifier\n  object\n  __typename\n}\n\nfragment Stash on Stash {\n  id\n  name\n  description\n  createdAt\n  updatedAt\n  owner {\n    id\n    username\n    __typename\n  }\n  __typename\n}\n\nfragment ListStash on Stash {\n  ...Stash\n  items {\n    ...StashItem\n    __typename\n  }\n  __typename\n}\n\nquery MyStashes($pagination: OffsetPaginationInput) {\n  stashes(pagination: $pagination) {\n    ...ListStash\n    __typename\n  }\n}"
 
 
 class MeQuery(BaseModel):
@@ -2698,7 +2715,7 @@ class CommentsForQuery(BaseModel):
     class Meta:
         """Meta class for CommentsFor"""
 
-        document = "fragment Leaf on LeafDescendant {\n  bold\n  italic\n  code\n  text\n  __typename\n}\n\nfragment Mention on MentionDescendant {\n  user {\n    ...CommentUser\n    __typename\n  }\n  __typename\n}\n\nfragment Paragraph on ParagraphDescendant {\n  size\n  __typename\n}\n\nfragment CommentUser on User {\n  id\n  username\n  avatar\n  profile {\n    avatar {\n      presignedUrl\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment SubthreadComment on Comment {\n  user {\n    ...CommentUser\n    __typename\n  }\n  parent {\n    id\n    __typename\n  }\n  createdAt\n  descendants {\n    ...Descendant\n    __typename\n  }\n  __typename\n}\n\nfragment Descendant on Descendant {\n  kind\n  children {\n    kind\n    children {\n      kind\n      unsafeChildren\n      ...Leaf\n      ...Mention\n      ...Paragraph\n      __typename\n    }\n    ...Leaf\n    ...Mention\n    ...Paragraph\n    __typename\n  }\n  ...Mention\n  ...Paragraph\n  ...Leaf\n  __typename\n}\n\nfragment ListComment on Comment {\n  user {\n    ...CommentUser\n    __typename\n  }\n  parent {\n    id\n    __typename\n  }\n  descendants {\n    ...Descendant\n    __typename\n  }\n  resolved\n  resolvedBy {\n    ...CommentUser\n    __typename\n  }\n  id\n  createdAt\n  children {\n    ...SubthreadComment\n    __typename\n  }\n  __typename\n}\n\nquery CommentsFor($object: ID!, $identifier: Identifier!) {\n  commentsFor(identifier: $identifier, object: $object) {\n    ...ListComment\n    __typename\n  }\n}"
+        document = "fragment Mention on MentionDescendant {\n  user {\n    ...CommentUser\n    __typename\n  }\n  __typename\n}\n\nfragment Leaf on LeafDescendant {\n  bold\n  italic\n  code\n  text\n  __typename\n}\n\nfragment Paragraph on ParagraphDescendant {\n  size\n  __typename\n}\n\nfragment CommentUser on User {\n  id\n  username\n  avatar\n  profile {\n    avatar {\n      presignedUrl\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment SubthreadComment on Comment {\n  user {\n    ...CommentUser\n    __typename\n  }\n  parent {\n    id\n    __typename\n  }\n  createdAt\n  descendants {\n    ...Descendant\n    __typename\n  }\n  __typename\n}\n\nfragment Descendant on Descendant {\n  kind\n  children {\n    kind\n    children {\n      kind\n      unsafeChildren\n      ...Leaf\n      ...Mention\n      ...Paragraph\n      __typename\n    }\n    ...Leaf\n    ...Mention\n    ...Paragraph\n    __typename\n  }\n  ...Mention\n  ...Paragraph\n  ...Leaf\n  __typename\n}\n\nfragment ListComment on Comment {\n  user {\n    ...CommentUser\n    __typename\n  }\n  parent {\n    id\n    __typename\n  }\n  descendants {\n    ...Descendant\n    __typename\n  }\n  resolved\n  resolvedBy {\n    ...CommentUser\n    __typename\n  }\n  id\n  createdAt\n  children {\n    ...SubthreadComment\n    __typename\n  }\n  __typename\n}\n\nquery CommentsFor($object: ID!, $identifier: Identifier!) {\n  commentsFor(identifier: $identifier, object: $object) {\n    ...ListComment\n    __typename\n  }\n}"
 
 
 class MyMentionsQuery(BaseModel):
@@ -2714,7 +2731,7 @@ class MyMentionsQuery(BaseModel):
     class Meta:
         """Meta class for MyMentions"""
 
-        document = "fragment Leaf on LeafDescendant {\n  bold\n  italic\n  code\n  text\n  __typename\n}\n\nfragment Mention on MentionDescendant {\n  user {\n    ...CommentUser\n    __typename\n  }\n  __typename\n}\n\nfragment Paragraph on ParagraphDescendant {\n  size\n  __typename\n}\n\nfragment CommentUser on User {\n  id\n  username\n  avatar\n  profile {\n    avatar {\n      presignedUrl\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment SubthreadComment on Comment {\n  user {\n    ...CommentUser\n    __typename\n  }\n  parent {\n    id\n    __typename\n  }\n  createdAt\n  descendants {\n    ...Descendant\n    __typename\n  }\n  __typename\n}\n\nfragment Descendant on Descendant {\n  kind\n  children {\n    kind\n    children {\n      kind\n      unsafeChildren\n      ...Leaf\n      ...Mention\n      ...Paragraph\n      __typename\n    }\n    ...Leaf\n    ...Mention\n    ...Paragraph\n    __typename\n  }\n  ...Mention\n  ...Paragraph\n  ...Leaf\n  __typename\n}\n\nfragment MentionComment on Comment {\n  user {\n    ...CommentUser\n    __typename\n  }\n  parent {\n    id\n    __typename\n  }\n  descendants {\n    ...Descendant\n    __typename\n  }\n  id\n  createdAt\n  children {\n    ...SubthreadComment\n    __typename\n  }\n  mentions {\n    ...CommentUser\n    __typename\n  }\n  resolved\n  resolvedBy {\n    ...CommentUser\n    __typename\n  }\n  object\n  identifier\n  __typename\n}\n\nquery MyMentions {\n  myMentions {\n    ...MentionComment\n    __typename\n  }\n}"
+        document = "fragment Mention on MentionDescendant {\n  user {\n    ...CommentUser\n    __typename\n  }\n  __typename\n}\n\nfragment Leaf on LeafDescendant {\n  bold\n  italic\n  code\n  text\n  __typename\n}\n\nfragment Paragraph on ParagraphDescendant {\n  size\n  __typename\n}\n\nfragment CommentUser on User {\n  id\n  username\n  avatar\n  profile {\n    avatar {\n      presignedUrl\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment SubthreadComment on Comment {\n  user {\n    ...CommentUser\n    __typename\n  }\n  parent {\n    id\n    __typename\n  }\n  createdAt\n  descendants {\n    ...Descendant\n    __typename\n  }\n  __typename\n}\n\nfragment Descendant on Descendant {\n  kind\n  children {\n    kind\n    children {\n      kind\n      unsafeChildren\n      ...Leaf\n      ...Mention\n      ...Paragraph\n      __typename\n    }\n    ...Leaf\n    ...Mention\n    ...Paragraph\n    __typename\n  }\n  ...Mention\n  ...Paragraph\n  ...Leaf\n  __typename\n}\n\nfragment MentionComment on Comment {\n  user {\n    ...CommentUser\n    __typename\n  }\n  parent {\n    id\n    __typename\n  }\n  descendants {\n    ...Descendant\n    __typename\n  }\n  id\n  createdAt\n  children {\n    ...SubthreadComment\n    __typename\n  }\n  mentions {\n    ...CommentUser\n    __typename\n  }\n  resolved\n  resolvedBy {\n    ...CommentUser\n    __typename\n  }\n  object\n  identifier\n  __typename\n}\n\nquery MyMentions {\n  myMentions {\n    ...MentionComment\n    __typename\n  }\n}"
 
 
 class DetailCommentQuery(BaseModel):
@@ -2731,7 +2748,7 @@ class DetailCommentQuery(BaseModel):
     class Meta:
         """Meta class for DetailComment"""
 
-        document = "fragment Leaf on LeafDescendant {\n  bold\n  italic\n  code\n  text\n  __typename\n}\n\nfragment Mention on MentionDescendant {\n  user {\n    ...CommentUser\n    __typename\n  }\n  __typename\n}\n\nfragment Paragraph on ParagraphDescendant {\n  size\n  __typename\n}\n\nfragment CommentUser on User {\n  id\n  username\n  avatar\n  profile {\n    avatar {\n      presignedUrl\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment SubthreadComment on Comment {\n  user {\n    ...CommentUser\n    __typename\n  }\n  parent {\n    id\n    __typename\n  }\n  createdAt\n  descendants {\n    ...Descendant\n    __typename\n  }\n  __typename\n}\n\nfragment Descendant on Descendant {\n  kind\n  children {\n    kind\n    children {\n      kind\n      unsafeChildren\n      ...Leaf\n      ...Mention\n      ...Paragraph\n      __typename\n    }\n    ...Leaf\n    ...Mention\n    ...Paragraph\n    __typename\n  }\n  ...Mention\n  ...Paragraph\n  ...Leaf\n  __typename\n}\n\nfragment DetailComment on Comment {\n  user {\n    ...CommentUser\n    __typename\n  }\n  parent {\n    id\n    __typename\n  }\n  descendants {\n    ...Descendant\n    __typename\n  }\n  id\n  resolved\n  resolvedBy {\n    ...CommentUser\n    __typename\n  }\n  createdAt\n  children {\n    ...SubthreadComment\n    __typename\n  }\n  mentions {\n    ...CommentUser\n    __typename\n  }\n  object\n  identifier\n  __typename\n}\n\nquery DetailComment($id: ID!) {\n  comment(id: $id) {\n    ...DetailComment\n    __typename\n  }\n}"
+        document = "fragment Mention on MentionDescendant {\n  user {\n    ...CommentUser\n    __typename\n  }\n  __typename\n}\n\nfragment Leaf on LeafDescendant {\n  bold\n  italic\n  code\n  text\n  __typename\n}\n\nfragment Paragraph on ParagraphDescendant {\n  size\n  __typename\n}\n\nfragment CommentUser on User {\n  id\n  username\n  avatar\n  profile {\n    avatar {\n      presignedUrl\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment SubthreadComment on Comment {\n  user {\n    ...CommentUser\n    __typename\n  }\n  parent {\n    id\n    __typename\n  }\n  createdAt\n  descendants {\n    ...Descendant\n    __typename\n  }\n  __typename\n}\n\nfragment Descendant on Descendant {\n  kind\n  children {\n    kind\n    children {\n      kind\n      unsafeChildren\n      ...Leaf\n      ...Mention\n      ...Paragraph\n      __typename\n    }\n    ...Leaf\n    ...Mention\n    ...Paragraph\n    __typename\n  }\n  ...Mention\n  ...Paragraph\n  ...Leaf\n  __typename\n}\n\nfragment DetailComment on Comment {\n  user {\n    ...CommentUser\n    __typename\n  }\n  parent {\n    id\n    __typename\n  }\n  descendants {\n    ...Descendant\n    __typename\n  }\n  id\n  resolved\n  resolvedBy {\n    ...CommentUser\n    __typename\n  }\n  createdAt\n  children {\n    ...SubthreadComment\n    __typename\n  }\n  mentions {\n    ...CommentUser\n    __typename\n  }\n  object\n  identifier\n  __typename\n}\n\nquery DetailComment($id: ID!) {\n  comment(id: $id) {\n    ...DetailComment\n    __typename\n  }\n}"
 
 
 class WatchMentionsSubscription(BaseModel):
@@ -2747,7 +2764,7 @@ class WatchMentionsSubscription(BaseModel):
     class Meta:
         """Meta class for WatchMentions"""
 
-        document = "fragment Leaf on LeafDescendant {\n  bold\n  italic\n  code\n  text\n  __typename\n}\n\nfragment Mention on MentionDescendant {\n  user {\n    ...CommentUser\n    __typename\n  }\n  __typename\n}\n\nfragment Paragraph on ParagraphDescendant {\n  size\n  __typename\n}\n\nfragment CommentUser on User {\n  id\n  username\n  avatar\n  profile {\n    avatar {\n      presignedUrl\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment SubthreadComment on Comment {\n  user {\n    ...CommentUser\n    __typename\n  }\n  parent {\n    id\n    __typename\n  }\n  createdAt\n  descendants {\n    ...Descendant\n    __typename\n  }\n  __typename\n}\n\nfragment Descendant on Descendant {\n  kind\n  children {\n    kind\n    children {\n      kind\n      unsafeChildren\n      ...Leaf\n      ...Mention\n      ...Paragraph\n      __typename\n    }\n    ...Leaf\n    ...Mention\n    ...Paragraph\n    __typename\n  }\n  ...Mention\n  ...Paragraph\n  ...Leaf\n  __typename\n}\n\nfragment MentionComment on Comment {\n  user {\n    ...CommentUser\n    __typename\n  }\n  parent {\n    id\n    __typename\n  }\n  descendants {\n    ...Descendant\n    __typename\n  }\n  id\n  createdAt\n  children {\n    ...SubthreadComment\n    __typename\n  }\n  mentions {\n    ...CommentUser\n    __typename\n  }\n  resolved\n  resolvedBy {\n    ...CommentUser\n    __typename\n  }\n  object\n  identifier\n  __typename\n}\n\nsubscription WatchMentions {\n  mentions {\n    ...MentionComment\n    __typename\n  }\n}"
+        document = "fragment Mention on MentionDescendant {\n  user {\n    ...CommentUser\n    __typename\n  }\n  __typename\n}\n\nfragment Leaf on LeafDescendant {\n  bold\n  italic\n  code\n  text\n  __typename\n}\n\nfragment Paragraph on ParagraphDescendant {\n  size\n  __typename\n}\n\nfragment CommentUser on User {\n  id\n  username\n  avatar\n  profile {\n    avatar {\n      presignedUrl\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment SubthreadComment on Comment {\n  user {\n    ...CommentUser\n    __typename\n  }\n  parent {\n    id\n    __typename\n  }\n  createdAt\n  descendants {\n    ...Descendant\n    __typename\n  }\n  __typename\n}\n\nfragment Descendant on Descendant {\n  kind\n  children {\n    kind\n    children {\n      kind\n      unsafeChildren\n      ...Leaf\n      ...Mention\n      ...Paragraph\n      __typename\n    }\n    ...Leaf\n    ...Mention\n    ...Paragraph\n    __typename\n  }\n  ...Mention\n  ...Paragraph\n  ...Leaf\n  __typename\n}\n\nfragment MentionComment on Comment {\n  user {\n    ...CommentUser\n    __typename\n  }\n  parent {\n    id\n    __typename\n  }\n  descendants {\n    ...Descendant\n    __typename\n  }\n  id\n  createdAt\n  children {\n    ...SubthreadComment\n    __typename\n  }\n  mentions {\n    ...CommentUser\n    __typename\n  }\n  resolved\n  resolvedBy {\n    ...CommentUser\n    __typename\n  }\n  object\n  identifier\n  __typename\n}\n\nsubscription WatchMentions {\n  mentions {\n    ...MentionComment\n    __typename\n  }\n}"
 
 
 async def aupdate_service_instance(
@@ -3085,33 +3102,35 @@ def resolve_comment(id: ID, rath: Optional[UnlokRath] = None) -> ListComment:
 
 
 async def acreate_client(
-    identifier: str,
-    version: str,
-    scopes: List[str],
-    logo: Optional[str] = None,
+    manifest: ManifestInput,
+    requirements: Iterable[Requirement],
+    composition: Optional[ID] = None,
+    layers: Optional[Iterable[str]] = ["web"],
     rath: Optional[UnlokRath] = None,
-) -> CreateClientMutationCreatedevelopmentalclient:
+) -> DetailClient:
     """CreateClient
 
 
     Args:
-        identifier (str): No description
-        version (str): No description
-        scopes (List[str]): No description
-        logo (Optional[str], optional): No description.
+        manifest:  (required)
+        composition: The `ID` scalar type represents a unique identifier, often used to refetch an object or as key for a cache. The ID type appears in a JSON response as a String; however, it is not intended to be human-readable. When expected as an input type, any string (such as `"4"`) or integer (such as `4`) input value will be accepted as an ID.
+        requirements:  (required) (list) (required)
+        layers: The `String` scalar type represents textual data, represented as UTF-8 character sequences. The String type is most often used by GraphQL to represent free-form human-readable text. (required) (list)
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
-        CreateClientMutationCreatedevelopmentalclient
+        DetailClient
     """
     return (
         await aexecute(
             CreateClientMutation,
             {
-                "identifier": identifier,
-                "version": version,
-                "scopes": scopes,
-                "logo": logo,
+                "input": {
+                    "manifest": manifest,
+                    "composition": composition,
+                    "requirements": requirements,
+                    "layers": layers,
+                }
             },
             rath=rath,
         )
@@ -3119,28 +3138,35 @@ async def acreate_client(
 
 
 def create_client(
-    identifier: str,
-    version: str,
-    scopes: List[str],
-    logo: Optional[str] = None,
+    manifest: ManifestInput,
+    requirements: Iterable[Requirement],
+    composition: Optional[ID] = None,
+    layers: Optional[Iterable[str]] = ["web"],
     rath: Optional[UnlokRath] = None,
-) -> CreateClientMutationCreatedevelopmentalclient:
+) -> DetailClient:
     """CreateClient
 
 
     Args:
-        identifier (str): No description
-        version (str): No description
-        scopes (List[str]): No description
-        logo (Optional[str], optional): No description.
+        manifest:  (required)
+        composition: The `ID` scalar type represents a unique identifier, often used to refetch an object or as key for a cache. The ID type appears in a JSON response as a String; however, it is not intended to be human-readable. When expected as an input type, any string (such as `"4"`) or integer (such as `4`) input value will be accepted as an ID.
+        requirements:  (required) (list) (required)
+        layers: The `String` scalar type represents textual data, represented as UTF-8 character sequences. The String type is most often used by GraphQL to represent free-form human-readable text. (required) (list)
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
-        CreateClientMutationCreatedevelopmentalclient
+        DetailClient
     """
     return execute(
         CreateClientMutation,
-        {"identifier": identifier, "version": version, "scopes": scopes, "logo": logo},
+        {
+            "input": {
+                "manifest": manifest,
+                "composition": composition,
+                "requirements": requirements,
+                "layers": layers,
+            }
+        },
         rath=rath,
     ).create_developmental_client
 
@@ -4713,6 +4739,7 @@ def watch_mentions(rath: Optional[UnlokRath] = None) -> Iterator[MentionComment]
 AppFilter.model_rebuild()
 ClientFilter.model_rebuild()
 DescendantInput.model_rebuild()
+DevelopmentClientInput.model_rebuild()
 GroupFilter.model_rebuild()
 LayerFilter.model_rebuild()
 RedeemTokenFilter.model_rebuild()
