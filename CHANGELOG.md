@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.1.1 (2025-06-27)
+
+### Bug Fixes
+
+- Inconsitent api
+  ([`d3c655d`](https://github.com/arkitektio/unlok-next/commit/d3c655dbf48d9b427a0cd8f00229c2e6e9996551))
+
+
 ## v1.1.0 (2025-06-27)
 
 
