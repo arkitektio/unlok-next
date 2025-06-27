@@ -425,9 +425,6 @@ type ServiceInstance {
   """The service that this instance belongs to."""
   service: Service!
 
-  """The backend that this instance belongs to."""
-  backend: BackendType!
-
   """
   The name of the instance. This is a human readable name of the instance.
   """
@@ -437,11 +434,6 @@ type ServiceInstance {
   The identifier of the instance. This is a unique string that identifies the instance. It is used to identify the instance in the code and in the database.
   """
   identifier: String!
-
-  """
-  The user defined instances of the service instance. These instances are used to configure the service instance with user defined values.
-  """
-  userDefinitions: [UserDefinedServiceInstance!]!
 
   """The users that are allowed to use this instance."""
   allowedUsers(filters: UserFilter, pagination: OffsetPaginationInput): [User!]!
@@ -455,9 +447,6 @@ type ServiceInstance {
   """The groups that are denied to use this instance."""
   deniedGroups(filters: GroupFilter, pagination: OffsetPaginationInput): [Group!]!
 
-  """The layer that this instance belongs to."""
-  layer: Layer!
-
   """
   The mappings of the composition. A mapping is a mapping of a service to a service instance. This is used to configure the composition.
   """
@@ -467,6 +456,11 @@ type ServiceInstance {
   The logo of the app. This should be a url to a logo that can be used to represent the app.
   """
   logo: MediaStore
+
+  """
+  The aliases of the instance. An alias is a way to reach the instance. Clients can use these aliases to check if they can reach the instance. An alias can be an absolute alias (e.g. 'example.com') or a relative alias (e.g. 'example.com/path'). If the alias is relative, it will be relative to the layer's domain, port and path.
+  """
+  aliases: [InstanceAlias!]!
 }
 
 """
@@ -504,9 +498,7 @@ The Service identifier is a unique identifier for a service. It is used to ident
 """
 scalar ServiceIdentifier
 
-"""
-ServiceInstance(id, backend, layer, service, logo, identifier, template)
-"""
+"""ServiceInstance(id, service, logo, identifier, steward, template)"""
 input ServiceInstanceFilter {
   search: String
   ids: [ID!]
@@ -515,49 +507,6 @@ input ServiceInstanceFilter {
   NOT: ServiceInstanceFilter
   DISTINCT: Boolean
 }
-
-enum BackendType {
-  user_defined
-  DockerBackend
-}
-
-"""
-A UserDefinedServiceInstance is a user defined instance of a service. It is used to configure a service instance with user defined values.
-"""
-type UserDefinedServiceInstance {
-  id: ID!
-
-  """The user that created this user defined instance."""
-  creator: User!
-
-  """The instance that this user defined instance belongs to."""
-  instance: ServiceInstance!
-
-  """
-  The values of the user defined instance. These values will be used to configure the instance.
-  """
-  values: [DefinedValue!]!
-
-  """
-  The values of the user defined instance. These values will be used to configure the instance.
-  """
-  renderedValues: Fakt!
-}
-
-type DefinedValue {
-  key: String!
-  value: String!
-  asType: FaktValueType!
-}
-
-enum FaktValueType {
-  STRING
-  NUMBER
-  BOOLEAN
-}
-
-"""The `Fakt` scalar type represents a reference to a fakt"""
-scalar Fakt
 
 """
 A User of the System
@@ -575,6 +524,47 @@ input UserFilter {
   OR: UserFilter
   NOT: UserFilter
   DISTINCT: Boolean
+}
+
+"""
+An alias for a service instance. This is used to provide a more user-friendly name for the instance.
+"""
+type InstanceAlias {
+  id: ID!
+
+  """The layer that this alias belongs to."""
+  layer: Layer!
+
+  """The instance that this alias belongs to."""
+  instance: ServiceInstance!
+
+  """The name of the alias. This is a human readable name of the alias."""
+  kind: String!
+
+  """
+  The host of the alias, if its a ABSOLUTE alias (e.g. 'example.com'). If not set, the alias is relative to the layer's domain.
+  """
+  host: String
+
+  """
+  The port of the alias, if its a ABSOLUTE alias (e.g. 'example.com:8080'). If not set, the alias is relative to the layer's port.
+  """
+  port: Int
+
+  """
+  The path of the alias, if its a ABSOLUTE alias (e.g. 'example.com/path'). If not set, the alias is relative to the layer's path.
+  """
+  path: String
+
+  """
+  Is this alias using SSL? If true, the alias will be accessed via https:// instead of http://. This is used to indicate that the alias is secure and should be accessed via SSL
+  """
+  ssl: Boolean!
+
+  """
+  The challenge of the alias. This is used to verify that the alias is reachable. If set, the alias will be accessed via the challenge URL (e.g. 'example.com/.well-known/challenge'). If not set, the alias will be accessed via the instance's URL.
+  """
+  challenge: String!
 }
 
 """
@@ -704,7 +694,7 @@ input LayerFilter {
 }
 
 """
-A redeem token is a token that can be used to redeed the rights to create
+A redeem token is a token that can be used to redeem the rights to create
 a client. It is used to give the recipient the right to create a client.
 
 If the token is not redeemed within the expires_at time, it will be invalid.
@@ -724,7 +714,7 @@ type RedeemToken {
 }
 
 """
-A redeem token is a token that can be used to redeed the rights to create
+A redeem token is a token that can be used to redeem the rights to create
 a client. It is used to give the recipient the right to create a client.
 
 If the token is not redeemed within the expires_at time, it will be invalid.
@@ -774,7 +764,6 @@ type Mutation {
   replyTo(input: ReplyToCommentInput!): Comment!
   resolveComment(input: ResolveCommentInput!): Comment!
   createDevelopmentalClient(input: DevelopmentClientInput!): Client!
-  scan(input: ScanBackendInput!): String!
   render(input: RenderInput!): Fakt!
   acknowledgeMessage(input: AcknowledgeMessageInput!): SystemMessage!
 
@@ -790,8 +779,10 @@ type Mutation {
   """Delete items from a stash"""
   deleteStashItems(input: DeleteStashItems!): [ID!]!
   deleteStash(input: DeleteStashInput!): ID!
-  createUserDefinedServiceInstance(input: UserDefinedServiceInstanceInput!): UserDefinedServiceInstance!
+  createServiceInstance(input: CreateServiceInstanceInput!): ServiceInstance!
   updateServiceInstance(input: UpdateServiceInstanceInput!): ServiceInstance!
+  createInstanceAlias(input: CreateServiceInstanceInput!): InstanceAlias!
+  updateInstanceAlias(input: UpdateServiceInstanceInput!): InstanceAlias!
   requestMediaUpload(input: RequestMediaUploadInput!): PresignedPostCredentials!
   updateProfile(input: UpdateProfileInput!): Profile!
   createProfile(input: CreateProfileInput!): Profile!
@@ -853,9 +844,8 @@ input Requirement {
   key: String!
 }
 
-input ScanBackendInput {
-  backend: String
-}
+"""The `Fakt` scalar type represents a reference to a fakt"""
+scalar Fakt
 
 input RenderInput {
   client: ID!
@@ -905,15 +895,13 @@ input DeleteStashInput {
   stash: ID!
 }
 
-input UserDefinedServiceInstanceInput {
+input CreateServiceInstanceInput {
   identifier: String!
-  values: [KeyValueInput!]! = []
-}
-
-input KeyValueInput {
-  key: String!
-  value: String!
-  asType: FaktValueType!
+  service: ID!
+  allowedUsers: [ID!] = null
+  allowedGroups: [ID!] = null
+  deniedGroups: [ID!] = null
+  deniedUsers: [ID!] = null
 }
 
 input UpdateServiceInstanceInput {

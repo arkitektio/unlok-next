@@ -1,20 +1,20 @@
-from typing import (
-    Tuple,
-    Annotated,
-    Literal,
-    AsyncIterator,
-    Optional,
-    Iterable,
-    Union,
-    List,
-    Any,
-    Iterator,
-)
-from pydantic import BaseModel, Field, ConfigDict
 from unlok_next.rath import UnlokRath
-from unlok_next.funcs import execute, aexecute, asubscribe, subscribe
-from rath.scalars import ID
+from pydantic import BaseModel, Field, ConfigDict
+from typing import (
+    Literal,
+    Annotated,
+    Tuple,
+    Any,
+    Optional,
+    AsyncIterator,
+    Iterable,
+    Iterator,
+    List,
+    Union,
+)
 from datetime import datetime
+from unlok_next.funcs import subscribe, asubscribe, aexecute, execute
+from rath.scalars import ID
 from enum import Enum
 
 
@@ -32,21 +32,6 @@ class ClientKind(str, Enum):
     DEVELOPMENT = "DEVELOPMENT"
     WEBSITE = "WEBSITE"
     DESKTOP = "DESKTOP"
-
-
-class BackendType(str, Enum):
-    """No documentation"""
-
-    user_defined = "user_defined"
-    DockerBackend = "DockerBackend"
-
-
-class FaktValueType(str, Enum):
-    """No documentation"""
-
-    STRING = "STRING"
-    NUMBER = "NUMBER"
-    BOOLEAN = "BOOLEAN"
 
 
 class GroupFilter(BaseModel):
@@ -100,7 +85,7 @@ class OffsetPaginationInput(BaseModel):
 
 
 class ServiceInstanceFilter(BaseModel):
-    """ServiceInstance(id, backend, layer, service, logo, identifier, template)"""
+    """ServiceInstance(id, service, logo, identifier, steward, template)"""
 
     search: Optional[str] = None
     ids: Optional[Tuple[ID, ...]] = None
@@ -190,7 +175,7 @@ class LayerFilter(BaseModel):
 
 
 class RedeemTokenFilter(BaseModel):
-    """A redeem token is a token that can be used to redeed the rights to create
+    """A redeem token is a token that can be used to redeem the rights to create
     a client. It is used to give the recipient the right to create a client.
 
     If the token is not redeemed within the expires_at time, it will be invalid.
@@ -234,22 +219,17 @@ class StashItemInput(BaseModel):
     )
 
 
-class UserDefinedServiceInstanceInput(BaseModel):
+class CreateServiceInstanceInput(BaseModel):
     """No documentation"""
 
     identifier: str
-    values: Tuple["KeyValueInput", ...]
-    model_config = ConfigDict(
-        frozen=True, extra="forbid", populate_by_name=True, use_enum_values=True
+    service: ID
+    allowed_users: Optional[Tuple[ID, ...]] = Field(alias="allowedUsers", default=None)
+    allowed_groups: Optional[Tuple[ID, ...]] = Field(
+        alias="allowedGroups", default=None
     )
-
-
-class KeyValueInput(BaseModel):
-    """No documentation"""
-
-    key: str
-    value: str
-    as_type: FaktValueType = Field(alias="asType")
+    denied_groups: Optional[Tuple[ID, ...]] = Field(alias="deniedGroups", default=None)
+    denied_users: Optional[Tuple[ID, ...]] = Field(alias="deniedUsers", default=None)
     model_config = ConfigDict(
         frozen=True, extra="forbid", populate_by_name=True, use_enum_values=True
     )
@@ -415,7 +395,7 @@ class ListRedeemTokenClient(BaseModel):
 
 
 class ListRedeemToken(BaseModel):
-    """A redeem token is a token that can be used to redeed the rights to create
+    """A redeem token is a token that can be used to redeem the rights to create
     a client. It is used to give the recipient the right to create a client.
 
     If the token is not redeemed within the expires_at time, it will be invalid.
@@ -690,29 +670,6 @@ class GroupProfile(BaseModel):
     model_config = ConfigDict(frozen=True)
 
 
-class ListUserDefinedServiceInstanceValues(BaseModel):
-    """No documentation"""
-
-    typename: Literal["DefinedValue"] = Field(
-        alias="__typename", default="DefinedValue", exclude=True
-    )
-    key: str
-    value: str
-    model_config = ConfigDict(frozen=True)
-
-
-class ListUserDefinedServiceInstance(BaseModel):
-    """A UserDefinedServiceInstance is a user defined instance of a service. It is used to configure a service instance with user defined values."""
-
-    typename: Literal["UserDefinedServiceInstance"] = Field(
-        alias="__typename", default="UserDefinedServiceInstance", exclude=True
-    )
-    id: ID
-    values: Tuple[ListUserDefinedServiceInstanceValues, ...]
-    "The values of the user defined instance. These values will be used to configure the instance."
-    model_config = ConfigDict(frozen=True)
-
-
 class ProfileAvatar(BaseModel):
     """MediaStore(id, path, key, bucket, populated, s3store_ptr)"""
 
@@ -957,18 +914,6 @@ class ListStash(Stash, BaseModel):
     model_config = ConfigDict(frozen=True)
 
 
-class ListServiceInstanceLayer(BaseModel):
-    """A Service is a Webservice that a Client might want to access. It is not the configured instance of the service, but the service itself."""
-
-    typename: Literal["Layer"] = Field(
-        alias="__typename", default="Layer", exclude=True
-    )
-    id: ID
-    name: str
-    "The name of the layer"
-    model_config = ConfigDict(frozen=True)
-
-
 class ListServiceInstance(BaseModel):
     """A ServiceInstance is a configured instance of a Service. It will be configured by a configuration backend and will be used to send to the client as a configuration. It should never contain sensitive information."""
 
@@ -976,16 +921,12 @@ class ListServiceInstance(BaseModel):
         alias="__typename", default="ServiceInstance", exclude=True
     )
     id: ID
-    backend: BackendType
-    "The backend that this instance belongs to."
     identifier: str
     "The identifier of the instance. This is a unique string that identifies the instance. It is used to identify the instance in the code and in the database."
     allowed_users: Tuple[ListUser, ...] = Field(alias="allowedUsers")
     "The users that are allowed to use this instance."
     denied_users: Tuple[ListUser, ...] = Field(alias="deniedUsers")
     "The users that are denied to use this instance."
-    layer: ListServiceInstanceLayer
-    "The layer that this instance belongs to."
     model_config = ConfigDict(frozen=True)
 
 
@@ -1430,18 +1371,6 @@ class ServiceInstanceService(BaseModel):
     model_config = ConfigDict(frozen=True)
 
 
-class ServiceInstanceLayer(BaseModel):
-    """A Service is a Webservice that a Client might want to access. It is not the configured instance of the service, but the service itself."""
-
-    typename: Literal["Layer"] = Field(
-        alias="__typename", default="Layer", exclude=True
-    )
-    id: ID
-    name: str
-    "The name of the layer"
-    model_config = ConfigDict(frozen=True)
-
-
 class ServiceInstanceLogo(BaseModel):
     """MediaStore(id, path, key, bucket, populated, s3store_ptr)"""
 
@@ -1459,8 +1388,6 @@ class ServiceInstance(BaseModel):
         alias="__typename", default="ServiceInstance", exclude=True
     )
     id: ID
-    backend: BackendType
-    "The backend that this instance belongs to."
     identifier: str
     "The identifier of the instance. This is a unique string that identifies the instance. It is used to identify the instance in the code and in the database."
     service: ServiceInstanceService
@@ -1473,14 +1400,8 @@ class ServiceInstance(BaseModel):
     "The groups that are allowed to use this instance."
     denied_groups: Tuple[ListGroup, ...] = Field(alias="deniedGroups")
     "The groups that are denied to use this instance."
-    user_definitions: Tuple[ListUserDefinedServiceInstance, ...] = Field(
-        alias="userDefinitions"
-    )
-    "The user defined instances of the service instance. These instances are used to configure the service instance with user defined values."
     mappings: Tuple[ListServiceInstanceMapping, ...]
     "The mappings of the composition. A mapping is a mapping of a service to a service instance. This is used to configure the composition."
-    layer: ServiceInstanceLayer
-    "The layer that this instance belongs to."
     logo: Optional[ServiceInstanceLogo] = Field(default=None)
     "The logo of the app. This should be a url to a logo that can be used to represent the app."
     model_config = ConfigDict(frozen=True)
@@ -1892,18 +1813,6 @@ class DetailComment(BaseModel):
     model_config = ConfigDict(frozen=True)
 
 
-class UserDefinedServiceInstance(BaseModel):
-    """A UserDefinedServiceInstance is a user defined instance of a service. It is used to configure a service instance with user defined values."""
-
-    typename: Literal["UserDefinedServiceInstance"] = Field(
-        alias="__typename", default="UserDefinedServiceInstance", exclude=True
-    )
-    id: ID
-    instance: ServiceInstance
-    "The instance that this user defined instance belongs to."
-    model_config = ConfigDict(frozen=True)
-
-
 class UpdateServiceInstanceMutation(BaseModel):
     """No documentation found for this operation."""
 
@@ -1913,11 +1822,29 @@ class UpdateServiceInstanceMutation(BaseModel):
         """Arguments for UpdateServiceInstance"""
 
         input: UpdateServiceInstanceInput
+        model_config = ConfigDict(populate_by_name=True)
 
     class Meta:
         """Meta class for UpdateServiceInstance"""
 
-        document = "fragment ListServiceInstance on ServiceInstance {\n  id\n  backend\n  identifier\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  layer {\n    id\n    name\n    __typename\n  }\n  __typename\n}\n\nfragment ListClient on Client {\n  id\n  user {\n    id\n    username\n    __typename\n  }\n  name\n  kind\n  release {\n    version\n    logo {\n      presignedUrl\n      __typename\n    }\n    app {\n      id\n      identifier\n      logo {\n        presignedUrl\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment ListUserDefinedServiceInstance on UserDefinedServiceInstance {\n  id\n  values {\n    key\n    value\n    __typename\n  }\n  __typename\n}\n\nfragment ListUser on User {\n  username\n  firstName\n  lastName\n  email\n  avatar\n  id\n  __typename\n}\n\nfragment ListServiceInstanceMapping on ServiceInstanceMapping {\n  id\n  key\n  instance {\n    ...ListServiceInstance\n    __typename\n  }\n  client {\n    ...ListClient\n    __typename\n  }\n  optional\n  __typename\n}\n\nfragment ListGroup on Group {\n  id\n  name\n  profile {\n    id\n    bio\n    avatar {\n      presignedUrl\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment ServiceInstance on ServiceInstance {\n  id\n  backend\n  identifier\n  service {\n    identifier\n    id\n    description\n    name\n    __typename\n  }\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  allowedGroups {\n    ...ListGroup\n    __typename\n  }\n  deniedGroups {\n    ...ListGroup\n    __typename\n  }\n  userDefinitions {\n    ...ListUserDefinedServiceInstance\n    __typename\n  }\n  mappings {\n    ...ListServiceInstanceMapping\n    __typename\n  }\n  layer {\n    id\n    name\n    __typename\n  }\n  logo {\n    presignedUrl\n    __typename\n  }\n  __typename\n}\n\nmutation UpdateServiceInstance($input: UpdateServiceInstanceInput!) {\n  updateServiceInstance(input: $input) {\n    ...ServiceInstance\n    __typename\n  }\n}"
+        document = "fragment ListServiceInstance on ServiceInstance {\n  id\n  identifier\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  __typename\n}\n\nfragment ListClient on Client {\n  id\n  user {\n    id\n    username\n    __typename\n  }\n  name\n  kind\n  release {\n    version\n    logo {\n      presignedUrl\n      __typename\n    }\n    app {\n      id\n      identifier\n      logo {\n        presignedUrl\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment ListGroup on Group {\n  id\n  name\n  profile {\n    id\n    bio\n    avatar {\n      presignedUrl\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment ListUser on User {\n  username\n  firstName\n  lastName\n  email\n  avatar\n  id\n  __typename\n}\n\nfragment ListServiceInstanceMapping on ServiceInstanceMapping {\n  id\n  key\n  instance {\n    ...ListServiceInstance\n    __typename\n  }\n  client {\n    ...ListClient\n    __typename\n  }\n  optional\n  __typename\n}\n\nfragment ServiceInstance on ServiceInstance {\n  id\n  identifier\n  service {\n    identifier\n    id\n    description\n    name\n    __typename\n  }\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  allowedGroups {\n    ...ListGroup\n    __typename\n  }\n  deniedGroups {\n    ...ListGroup\n    __typename\n  }\n  mappings {\n    ...ListServiceInstanceMapping\n    __typename\n  }\n  logo {\n    presignedUrl\n    __typename\n  }\n  __typename\n}\n\nmutation UpdateServiceInstance($input: UpdateServiceInstanceInput!) {\n  updateServiceInstance(input: $input) {\n    ...ServiceInstance\n    __typename\n  }\n}"
+
+
+class CreateServiceInstanceMutation(BaseModel):
+    """No documentation found for this operation."""
+
+    create_service_instance: ServiceInstance = Field(alias="createServiceInstance")
+
+    class Arguments(BaseModel):
+        """Arguments for CreateServiceInstance"""
+
+        input: CreateServiceInstanceInput
+        model_config = ConfigDict(populate_by_name=True)
+
+    class Meta:
+        """Meta class for CreateServiceInstance"""
+
+        document = "fragment ListServiceInstance on ServiceInstance {\n  id\n  identifier\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  __typename\n}\n\nfragment ListClient on Client {\n  id\n  user {\n    id\n    username\n    __typename\n  }\n  name\n  kind\n  release {\n    version\n    logo {\n      presignedUrl\n      __typename\n    }\n    app {\n      id\n      identifier\n      logo {\n        presignedUrl\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment ListGroup on Group {\n  id\n  name\n  profile {\n    id\n    bio\n    avatar {\n      presignedUrl\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment ListUser on User {\n  username\n  firstName\n  lastName\n  email\n  avatar\n  id\n  __typename\n}\n\nfragment ListServiceInstanceMapping on ServiceInstanceMapping {\n  id\n  key\n  instance {\n    ...ListServiceInstance\n    __typename\n  }\n  client {\n    ...ListClient\n    __typename\n  }\n  optional\n  __typename\n}\n\nfragment ServiceInstance on ServiceInstance {\n  id\n  identifier\n  service {\n    identifier\n    id\n    description\n    name\n    __typename\n  }\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  allowedGroups {\n    ...ListGroup\n    __typename\n  }\n  deniedGroups {\n    ...ListGroup\n    __typename\n  }\n  mappings {\n    ...ListServiceInstanceMapping\n    __typename\n  }\n  logo {\n    presignedUrl\n    __typename\n  }\n  __typename\n}\n\nmutation CreateServiceInstance($input: CreateServiceInstanceInput!) {\n  createServiceInstance(input: $input) {\n    ...ServiceInstance\n    __typename\n  }\n}"
 
 
 class RequestMediaUploadMutation(BaseModel):
@@ -1930,29 +1857,12 @@ class RequestMediaUploadMutation(BaseModel):
 
         key: str
         datalayer: str
+        model_config = ConfigDict(populate_by_name=True)
 
     class Meta:
         """Meta class for RequestMediaUpload"""
 
         document = "fragment PresignedPostCredentials on PresignedPostCredentials {\n  xAmzAlgorithm\n  xAmzCredential\n  xAmzDate\n  xAmzSignature\n  key\n  bucket\n  datalayer\n  policy\n  store\n  __typename\n}\n\nmutation RequestMediaUpload($key: String!, $datalayer: String!) {\n  requestMediaUpload(input: {key: $key, datalayer: $datalayer}) {\n    ...PresignedPostCredentials\n    __typename\n  }\n}"
-
-
-class CreateUserDefinedServiceInstanceMutation(BaseModel):
-    """No documentation found for this operation."""
-
-    create_user_defined_service_instance: UserDefinedServiceInstance = Field(
-        alias="createUserDefinedServiceInstance"
-    )
-
-    class Arguments(BaseModel):
-        """Arguments for CreateUserDefinedServiceInstance"""
-
-        input: UserDefinedServiceInstanceInput
-
-    class Meta:
-        """Meta class for CreateUserDefinedServiceInstance"""
-
-        document = "fragment ListServiceInstance on ServiceInstance {\n  id\n  backend\n  identifier\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  layer {\n    id\n    name\n    __typename\n  }\n  __typename\n}\n\nfragment ListClient on Client {\n  id\n  user {\n    id\n    username\n    __typename\n  }\n  name\n  kind\n  release {\n    version\n    logo {\n      presignedUrl\n      __typename\n    }\n    app {\n      id\n      identifier\n      logo {\n        presignedUrl\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment ListUserDefinedServiceInstance on UserDefinedServiceInstance {\n  id\n  values {\n    key\n    value\n    __typename\n  }\n  __typename\n}\n\nfragment ListUser on User {\n  username\n  firstName\n  lastName\n  email\n  avatar\n  id\n  __typename\n}\n\nfragment ListServiceInstanceMapping on ServiceInstanceMapping {\n  id\n  key\n  instance {\n    ...ListServiceInstance\n    __typename\n  }\n  client {\n    ...ListClient\n    __typename\n  }\n  optional\n  __typename\n}\n\nfragment ListGroup on Group {\n  id\n  name\n  profile {\n    id\n    bio\n    avatar {\n      presignedUrl\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment ServiceInstance on ServiceInstance {\n  id\n  backend\n  identifier\n  service {\n    identifier\n    id\n    description\n    name\n    __typename\n  }\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  allowedGroups {\n    ...ListGroup\n    __typename\n  }\n  deniedGroups {\n    ...ListGroup\n    __typename\n  }\n  userDefinitions {\n    ...ListUserDefinedServiceInstance\n    __typename\n  }\n  mappings {\n    ...ListServiceInstanceMapping\n    __typename\n  }\n  layer {\n    id\n    name\n    __typename\n  }\n  logo {\n    presignedUrl\n    __typename\n  }\n  __typename\n}\n\nfragment UserDefinedServiceInstance on UserDefinedServiceInstance {\n  id\n  instance {\n    ...ServiceInstance\n    __typename\n  }\n  __typename\n}\n\nmutation CreateUserDefinedServiceInstance($input: UserDefinedServiceInstanceInput!) {\n  createUserDefinedServiceInstance(input: $input) {\n    ...UserDefinedServiceInstance\n    __typename\n  }\n}"
 
 
 class CreateCommentMutation(BaseModel):
@@ -1967,11 +1877,12 @@ class CreateCommentMutation(BaseModel):
         identifier: str
         descendants: List[DescendantInput]
         parent: Optional[ID] = Field(default=None)
+        model_config = ConfigDict(populate_by_name=True)
 
     class Meta:
         """Meta class for CreateComment"""
 
-        document = "fragment Leaf on LeafDescendant {\n  bold\n  italic\n  code\n  text\n  __typename\n}\n\nfragment Paragraph on ParagraphDescendant {\n  size\n  __typename\n}\n\nfragment Mention on MentionDescendant {\n  user {\n    ...CommentUser\n    __typename\n  }\n  __typename\n}\n\nfragment SubthreadComment on Comment {\n  user {\n    ...CommentUser\n    __typename\n  }\n  parent {\n    id\n    __typename\n  }\n  createdAt\n  descendants {\n    ...Descendant\n    __typename\n  }\n  __typename\n}\n\nfragment CommentUser on User {\n  id\n  username\n  avatar\n  profile {\n    avatar {\n      presignedUrl\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment Descendant on Descendant {\n  kind\n  children {\n    kind\n    children {\n      kind\n      unsafeChildren\n      ...Leaf\n      ...Mention\n      ...Paragraph\n      __typename\n    }\n    ...Leaf\n    ...Mention\n    ...Paragraph\n    __typename\n  }\n  ...Mention\n  ...Paragraph\n  ...Leaf\n  __typename\n}\n\nfragment ListComment on Comment {\n  user {\n    ...CommentUser\n    __typename\n  }\n  parent {\n    id\n    __typename\n  }\n  descendants {\n    ...Descendant\n    __typename\n  }\n  resolved\n  resolvedBy {\n    ...CommentUser\n    __typename\n  }\n  id\n  createdAt\n  children {\n    ...SubthreadComment\n    __typename\n  }\n  __typename\n}\n\nmutation CreateComment($object: ID!, $identifier: Identifier!, $descendants: [DescendantInput!]!, $parent: ID) {\n  createComment(\n    input: {object: $object, identifier: $identifier, descendants: $descendants, parent: $parent}\n  ) {\n    ...ListComment\n    __typename\n  }\n}"
+        document = "fragment Leaf on LeafDescendant {\n  bold\n  italic\n  code\n  text\n  __typename\n}\n\nfragment Mention on MentionDescendant {\n  user {\n    ...CommentUser\n    __typename\n  }\n  __typename\n}\n\nfragment Paragraph on ParagraphDescendant {\n  size\n  __typename\n}\n\nfragment CommentUser on User {\n  id\n  username\n  avatar\n  profile {\n    avatar {\n      presignedUrl\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment SubthreadComment on Comment {\n  user {\n    ...CommentUser\n    __typename\n  }\n  parent {\n    id\n    __typename\n  }\n  createdAt\n  descendants {\n    ...Descendant\n    __typename\n  }\n  __typename\n}\n\nfragment Descendant on Descendant {\n  kind\n  children {\n    kind\n    children {\n      kind\n      unsafeChildren\n      ...Leaf\n      ...Mention\n      ...Paragraph\n      __typename\n    }\n    ...Leaf\n    ...Mention\n    ...Paragraph\n    __typename\n  }\n  ...Mention\n  ...Paragraph\n  ...Leaf\n  __typename\n}\n\nfragment ListComment on Comment {\n  user {\n    ...CommentUser\n    __typename\n  }\n  parent {\n    id\n    __typename\n  }\n  descendants {\n    ...Descendant\n    __typename\n  }\n  resolved\n  resolvedBy {\n    ...CommentUser\n    __typename\n  }\n  id\n  createdAt\n  children {\n    ...SubthreadComment\n    __typename\n  }\n  __typename\n}\n\nmutation CreateComment($object: ID!, $identifier: Identifier!, $descendants: [DescendantInput!]!, $parent: ID) {\n  createComment(\n    input: {object: $object, identifier: $identifier, descendants: $descendants, parent: $parent}\n  ) {\n    ...ListComment\n    __typename\n  }\n}"
 
 
 class ReplyToMutation(BaseModel):
@@ -1984,11 +1895,12 @@ class ReplyToMutation(BaseModel):
 
         descendants: List[DescendantInput]
         parent: ID
+        model_config = ConfigDict(populate_by_name=True)
 
     class Meta:
         """Meta class for ReplyTo"""
 
-        document = "fragment Leaf on LeafDescendant {\n  bold\n  italic\n  code\n  text\n  __typename\n}\n\nfragment Paragraph on ParagraphDescendant {\n  size\n  __typename\n}\n\nfragment Mention on MentionDescendant {\n  user {\n    ...CommentUser\n    __typename\n  }\n  __typename\n}\n\nfragment SubthreadComment on Comment {\n  user {\n    ...CommentUser\n    __typename\n  }\n  parent {\n    id\n    __typename\n  }\n  createdAt\n  descendants {\n    ...Descendant\n    __typename\n  }\n  __typename\n}\n\nfragment CommentUser on User {\n  id\n  username\n  avatar\n  profile {\n    avatar {\n      presignedUrl\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment Descendant on Descendant {\n  kind\n  children {\n    kind\n    children {\n      kind\n      unsafeChildren\n      ...Leaf\n      ...Mention\n      ...Paragraph\n      __typename\n    }\n    ...Leaf\n    ...Mention\n    ...Paragraph\n    __typename\n  }\n  ...Mention\n  ...Paragraph\n  ...Leaf\n  __typename\n}\n\nfragment ListComment on Comment {\n  user {\n    ...CommentUser\n    __typename\n  }\n  parent {\n    id\n    __typename\n  }\n  descendants {\n    ...Descendant\n    __typename\n  }\n  resolved\n  resolvedBy {\n    ...CommentUser\n    __typename\n  }\n  id\n  createdAt\n  children {\n    ...SubthreadComment\n    __typename\n  }\n  __typename\n}\n\nmutation ReplyTo($descendants: [DescendantInput!]!, $parent: ID!) {\n  replyTo(input: {descendants: $descendants, parent: $parent}) {\n    ...ListComment\n    __typename\n  }\n}"
+        document = "fragment Leaf on LeafDescendant {\n  bold\n  italic\n  code\n  text\n  __typename\n}\n\nfragment Mention on MentionDescendant {\n  user {\n    ...CommentUser\n    __typename\n  }\n  __typename\n}\n\nfragment Paragraph on ParagraphDescendant {\n  size\n  __typename\n}\n\nfragment CommentUser on User {\n  id\n  username\n  avatar\n  profile {\n    avatar {\n      presignedUrl\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment SubthreadComment on Comment {\n  user {\n    ...CommentUser\n    __typename\n  }\n  parent {\n    id\n    __typename\n  }\n  createdAt\n  descendants {\n    ...Descendant\n    __typename\n  }\n  __typename\n}\n\nfragment Descendant on Descendant {\n  kind\n  children {\n    kind\n    children {\n      kind\n      unsafeChildren\n      ...Leaf\n      ...Mention\n      ...Paragraph\n      __typename\n    }\n    ...Leaf\n    ...Mention\n    ...Paragraph\n    __typename\n  }\n  ...Mention\n  ...Paragraph\n  ...Leaf\n  __typename\n}\n\nfragment ListComment on Comment {\n  user {\n    ...CommentUser\n    __typename\n  }\n  parent {\n    id\n    __typename\n  }\n  descendants {\n    ...Descendant\n    __typename\n  }\n  resolved\n  resolvedBy {\n    ...CommentUser\n    __typename\n  }\n  id\n  createdAt\n  children {\n    ...SubthreadComment\n    __typename\n  }\n  __typename\n}\n\nmutation ReplyTo($descendants: [DescendantInput!]!, $parent: ID!) {\n  replyTo(input: {descendants: $descendants, parent: $parent}) {\n    ...ListComment\n    __typename\n  }\n}"
 
 
 class ResolveCommentMutation(BaseModel):
@@ -2000,11 +1912,12 @@ class ResolveCommentMutation(BaseModel):
         """Arguments for ResolveComment"""
 
         id: ID
+        model_config = ConfigDict(populate_by_name=True)
 
     class Meta:
         """Meta class for ResolveComment"""
 
-        document = "fragment Leaf on LeafDescendant {\n  bold\n  italic\n  code\n  text\n  __typename\n}\n\nfragment Paragraph on ParagraphDescendant {\n  size\n  __typename\n}\n\nfragment Mention on MentionDescendant {\n  user {\n    ...CommentUser\n    __typename\n  }\n  __typename\n}\n\nfragment SubthreadComment on Comment {\n  user {\n    ...CommentUser\n    __typename\n  }\n  parent {\n    id\n    __typename\n  }\n  createdAt\n  descendants {\n    ...Descendant\n    __typename\n  }\n  __typename\n}\n\nfragment CommentUser on User {\n  id\n  username\n  avatar\n  profile {\n    avatar {\n      presignedUrl\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment Descendant on Descendant {\n  kind\n  children {\n    kind\n    children {\n      kind\n      unsafeChildren\n      ...Leaf\n      ...Mention\n      ...Paragraph\n      __typename\n    }\n    ...Leaf\n    ...Mention\n    ...Paragraph\n    __typename\n  }\n  ...Mention\n  ...Paragraph\n  ...Leaf\n  __typename\n}\n\nfragment ListComment on Comment {\n  user {\n    ...CommentUser\n    __typename\n  }\n  parent {\n    id\n    __typename\n  }\n  descendants {\n    ...Descendant\n    __typename\n  }\n  resolved\n  resolvedBy {\n    ...CommentUser\n    __typename\n  }\n  id\n  createdAt\n  children {\n    ...SubthreadComment\n    __typename\n  }\n  __typename\n}\n\nmutation ResolveComment($id: ID!) {\n  resolveComment(input: {id: $id}) {\n    ...ListComment\n    __typename\n  }\n}"
+        document = "fragment Leaf on LeafDescendant {\n  bold\n  italic\n  code\n  text\n  __typename\n}\n\nfragment Mention on MentionDescendant {\n  user {\n    ...CommentUser\n    __typename\n  }\n  __typename\n}\n\nfragment Paragraph on ParagraphDescendant {\n  size\n  __typename\n}\n\nfragment CommentUser on User {\n  id\n  username\n  avatar\n  profile {\n    avatar {\n      presignedUrl\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment SubthreadComment on Comment {\n  user {\n    ...CommentUser\n    __typename\n  }\n  parent {\n    id\n    __typename\n  }\n  createdAt\n  descendants {\n    ...Descendant\n    __typename\n  }\n  __typename\n}\n\nfragment Descendant on Descendant {\n  kind\n  children {\n    kind\n    children {\n      kind\n      unsafeChildren\n      ...Leaf\n      ...Mention\n      ...Paragraph\n      __typename\n    }\n    ...Leaf\n    ...Mention\n    ...Paragraph\n    __typename\n  }\n  ...Mention\n  ...Paragraph\n  ...Leaf\n  __typename\n}\n\nfragment ListComment on Comment {\n  user {\n    ...CommentUser\n    __typename\n  }\n  parent {\n    id\n    __typename\n  }\n  descendants {\n    ...Descendant\n    __typename\n  }\n  resolved\n  resolvedBy {\n    ...CommentUser\n    __typename\n  }\n  id\n  createdAt\n  children {\n    ...SubthreadComment\n    __typename\n  }\n  __typename\n}\n\nmutation ResolveComment($id: ID!) {\n  resolveComment(input: {id: $id}) {\n    ...ListComment\n    __typename\n  }\n}"
 
 
 class CreateClientMutationCreatedevelopmentalclient(BaseModel):
@@ -2035,6 +1948,7 @@ class CreateClientMutation(BaseModel):
         version: str
         scopes: List[str]
         logo: Optional[str] = Field(default=None)
+        model_config = ConfigDict(populate_by_name=True)
 
     class Meta:
         """Meta class for CreateClient"""
@@ -2051,6 +1965,7 @@ class CreateGroupProfileMutation(BaseModel):
         """Arguments for CreateGroupProfile"""
 
         input: CreateGroupProfileInput
+        model_config = ConfigDict(populate_by_name=True)
 
     class Meta:
         """Meta class for CreateGroupProfile"""
@@ -2067,6 +1982,7 @@ class UpdateGroupProfileMutation(BaseModel):
         """Arguments for UpdateGroupProfile"""
 
         input: UpdateGroupProfileInput
+        model_config = ConfigDict(populate_by_name=True)
 
     class Meta:
         """Meta class for UpdateGroupProfile"""
@@ -2083,6 +1999,7 @@ class CreateUserProfileMutation(BaseModel):
         """Arguments for CreateUserProfile"""
 
         input: CreateProfileInput
+        model_config = ConfigDict(populate_by_name=True)
 
     class Meta:
         """Meta class for CreateUserProfile"""
@@ -2099,6 +2016,7 @@ class UpdateUserProfileMutation(BaseModel):
         """Arguments for UpdateUserProfile"""
 
         input: UpdateProfileInput
+        model_config = ConfigDict(populate_by_name=True)
 
     class Meta:
         """Meta class for UpdateUserProfile"""
@@ -2117,6 +2035,7 @@ class CreateStashMutation(BaseModel):
 
         name: Optional[str] = Field(default=None)
         description: Optional[str] = Field(default="")
+        model_config = ConfigDict(populate_by_name=True)
 
     class Meta:
         """Meta class for CreateStash"""
@@ -2135,6 +2054,7 @@ class AddItemsToStashMutation(BaseModel):
 
         stash: ID
         items: List[StashItemInput]
+        model_config = ConfigDict(populate_by_name=True)
 
     class Meta:
         """Meta class for AddItemsToStash"""
@@ -2152,6 +2072,7 @@ class DeleteStashItemsMutation(BaseModel):
         """Arguments for DeleteStashItems"""
 
         items: List[ID]
+        model_config = ConfigDict(populate_by_name=True)
 
     class Meta:
         """Meta class for DeleteStashItems"""
@@ -2168,6 +2089,7 @@ class DeleteStashMutation(BaseModel):
         """Arguments for DeleteStash"""
 
         stash: ID
+        model_config = ConfigDict(populate_by_name=True)
 
     class Meta:
         """Meta class for DeleteStash"""
@@ -2185,11 +2107,12 @@ class ListServiceInstancesQuery(BaseModel):
 
         pagination: Optional[OffsetPaginationInput] = Field(default=None)
         filters: Optional[ServiceInstanceFilter] = Field(default=None)
+        model_config = ConfigDict(populate_by_name=True)
 
     class Meta:
         """Meta class for ListServiceInstances"""
 
-        document = "fragment ListUser on User {\n  username\n  firstName\n  lastName\n  email\n  avatar\n  id\n  __typename\n}\n\nfragment ListServiceInstance on ServiceInstance {\n  id\n  backend\n  identifier\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  layer {\n    id\n    name\n    __typename\n  }\n  __typename\n}\n\nquery ListServiceInstances($pagination: OffsetPaginationInput, $filters: ServiceInstanceFilter) {\n  serviceInstances(pagination: $pagination, filters: $filters) {\n    ...ListServiceInstance\n    __typename\n  }\n}"
+        document = "fragment ListUser on User {\n  username\n  firstName\n  lastName\n  email\n  avatar\n  id\n  __typename\n}\n\nfragment ListServiceInstance on ServiceInstance {\n  id\n  identifier\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  __typename\n}\n\nquery ListServiceInstances($pagination: OffsetPaginationInput, $filters: ServiceInstanceFilter) {\n  serviceInstances(pagination: $pagination, filters: $filters) {\n    ...ListServiceInstance\n    __typename\n  }\n}"
 
 
 class GetServiceInstanceQuery(BaseModel):
@@ -2201,11 +2124,12 @@ class GetServiceInstanceQuery(BaseModel):
         """Arguments for GetServiceInstance"""
 
         id: ID
+        model_config = ConfigDict(populate_by_name=True)
 
     class Meta:
         """Meta class for GetServiceInstance"""
 
-        document = "fragment ListServiceInstance on ServiceInstance {\n  id\n  backend\n  identifier\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  layer {\n    id\n    name\n    __typename\n  }\n  __typename\n}\n\nfragment ListClient on Client {\n  id\n  user {\n    id\n    username\n    __typename\n  }\n  name\n  kind\n  release {\n    version\n    logo {\n      presignedUrl\n      __typename\n    }\n    app {\n      id\n      identifier\n      logo {\n        presignedUrl\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment ListUserDefinedServiceInstance on UserDefinedServiceInstance {\n  id\n  values {\n    key\n    value\n    __typename\n  }\n  __typename\n}\n\nfragment ListUser on User {\n  username\n  firstName\n  lastName\n  email\n  avatar\n  id\n  __typename\n}\n\nfragment ListServiceInstanceMapping on ServiceInstanceMapping {\n  id\n  key\n  instance {\n    ...ListServiceInstance\n    __typename\n  }\n  client {\n    ...ListClient\n    __typename\n  }\n  optional\n  __typename\n}\n\nfragment ListGroup on Group {\n  id\n  name\n  profile {\n    id\n    bio\n    avatar {\n      presignedUrl\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment ServiceInstance on ServiceInstance {\n  id\n  backend\n  identifier\n  service {\n    identifier\n    id\n    description\n    name\n    __typename\n  }\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  allowedGroups {\n    ...ListGroup\n    __typename\n  }\n  deniedGroups {\n    ...ListGroup\n    __typename\n  }\n  userDefinitions {\n    ...ListUserDefinedServiceInstance\n    __typename\n  }\n  mappings {\n    ...ListServiceInstanceMapping\n    __typename\n  }\n  layer {\n    id\n    name\n    __typename\n  }\n  logo {\n    presignedUrl\n    __typename\n  }\n  __typename\n}\n\nquery GetServiceInstance($id: ID!) {\n  serviceInstance(id: $id) {\n    ...ServiceInstance\n    __typename\n  }\n}"
+        document = "fragment ListServiceInstance on ServiceInstance {\n  id\n  identifier\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  __typename\n}\n\nfragment ListClient on Client {\n  id\n  user {\n    id\n    username\n    __typename\n  }\n  name\n  kind\n  release {\n    version\n    logo {\n      presignedUrl\n      __typename\n    }\n    app {\n      id\n      identifier\n      logo {\n        presignedUrl\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment ListGroup on Group {\n  id\n  name\n  profile {\n    id\n    bio\n    avatar {\n      presignedUrl\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment ListUser on User {\n  username\n  firstName\n  lastName\n  email\n  avatar\n  id\n  __typename\n}\n\nfragment ListServiceInstanceMapping on ServiceInstanceMapping {\n  id\n  key\n  instance {\n    ...ListServiceInstance\n    __typename\n  }\n  client {\n    ...ListClient\n    __typename\n  }\n  optional\n  __typename\n}\n\nfragment ServiceInstance on ServiceInstance {\n  id\n  identifier\n  service {\n    identifier\n    id\n    description\n    name\n    __typename\n  }\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  allowedGroups {\n    ...ListGroup\n    __typename\n  }\n  deniedGroups {\n    ...ListGroup\n    __typename\n  }\n  mappings {\n    ...ListServiceInstanceMapping\n    __typename\n  }\n  logo {\n    presignedUrl\n    __typename\n  }\n  __typename\n}\n\nquery GetServiceInstance($id: ID!) {\n  serviceInstance(id: $id) {\n    ...ServiceInstance\n    __typename\n  }\n}"
 
 
 class ListServicesQuery(BaseModel):
@@ -2218,11 +2142,12 @@ class ListServicesQuery(BaseModel):
 
         pagination: Optional[OffsetPaginationInput] = Field(default=None)
         filters: Optional[ServiceFilter] = Field(default=None)
+        model_config = ConfigDict(populate_by_name=True)
 
     class Meta:
         """Meta class for ListServices"""
 
-        document = "fragment ListUser on User {\n  username\n  firstName\n  lastName\n  email\n  avatar\n  id\n  __typename\n}\n\nfragment ListServiceInstance on ServiceInstance {\n  id\n  backend\n  identifier\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  layer {\n    id\n    name\n    __typename\n  }\n  __typename\n}\n\nfragment ListService on Service {\n  identifier\n  id\n  name\n  logo {\n    presignedUrl\n    __typename\n  }\n  description\n  instances {\n    ...ListServiceInstance\n    __typename\n  }\n  __typename\n}\n\nquery ListServices($pagination: OffsetPaginationInput, $filters: ServiceFilter) {\n  services(pagination: $pagination, filters: $filters) {\n    ...ListService\n    __typename\n  }\n}"
+        document = "fragment ListUser on User {\n  username\n  firstName\n  lastName\n  email\n  avatar\n  id\n  __typename\n}\n\nfragment ListServiceInstance on ServiceInstance {\n  id\n  identifier\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  __typename\n}\n\nfragment ListService on Service {\n  identifier\n  id\n  name\n  logo {\n    presignedUrl\n    __typename\n  }\n  description\n  instances {\n    ...ListServiceInstance\n    __typename\n  }\n  __typename\n}\n\nquery ListServices($pagination: OffsetPaginationInput, $filters: ServiceFilter) {\n  services(pagination: $pagination, filters: $filters) {\n    ...ListService\n    __typename\n  }\n}"
 
 
 class GetServiceQuery(BaseModel):
@@ -2234,11 +2159,12 @@ class GetServiceQuery(BaseModel):
         """Arguments for GetService"""
 
         id: ID
+        model_config = ConfigDict(populate_by_name=True)
 
     class Meta:
         """Meta class for GetService"""
 
-        document = "fragment ListUser on User {\n  username\n  firstName\n  lastName\n  email\n  avatar\n  id\n  __typename\n}\n\nfragment ListServiceInstance on ServiceInstance {\n  id\n  backend\n  identifier\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  layer {\n    id\n    name\n    __typename\n  }\n  __typename\n}\n\nfragment Service on Service {\n  identifier\n  id\n  name\n  logo {\n    presignedUrl\n    __typename\n  }\n  description\n  instances {\n    ...ListServiceInstance\n    __typename\n  }\n  __typename\n}\n\nquery GetService($id: ID!) {\n  service(id: $id) {\n    ...Service\n    __typename\n  }\n}"
+        document = "fragment ListUser on User {\n  username\n  firstName\n  lastName\n  email\n  avatar\n  id\n  __typename\n}\n\nfragment ListServiceInstance on ServiceInstance {\n  id\n  identifier\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  __typename\n}\n\nfragment Service on Service {\n  identifier\n  id\n  name\n  logo {\n    presignedUrl\n    __typename\n  }\n  description\n  instances {\n    ...ListServiceInstance\n    __typename\n  }\n  __typename\n}\n\nquery GetService($id: ID!) {\n  service(id: $id) {\n    ...Service\n    __typename\n  }\n}"
 
 
 class ReleasesQuery(BaseModel):
@@ -2248,6 +2174,8 @@ class ReleasesQuery(BaseModel):
 
     class Arguments(BaseModel):
         """Arguments for Releases"""
+
+        model_config = ConfigDict(populate_by_name=True)
 
     class Meta:
         """Meta class for Releases"""
@@ -2267,11 +2195,12 @@ class ReleaseQuery(BaseModel):
         version: Optional[str] = Field(default=None)
         id: Optional[ID] = Field(default=None)
         client_id: Optional[ID] = Field(alias="clientId", default=None)
+        model_config = ConfigDict(populate_by_name=True)
 
     class Meta:
         """Meta class for Release"""
 
-        document = "fragment ListApp on App {\n  id\n  identifier\n  logo {\n    presignedUrl\n    __typename\n  }\n  __typename\n}\n\nfragment ListClient on Client {\n  id\n  user {\n    id\n    username\n    __typename\n  }\n  name\n  kind\n  release {\n    version\n    logo {\n      presignedUrl\n      __typename\n    }\n    app {\n      id\n      identifier\n      logo {\n        presignedUrl\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment DetailRelease on Release {\n  id\n  version\n  logo {\n    presignedUrl\n    __typename\n  }\n  app {\n    ...ListApp\n    __typename\n  }\n  clients {\n    ...ListClient\n    __typename\n  }\n  __typename\n}\n\nquery Release($identifier: AppIdentifier, $version: Version, $id: ID, $clientId: ID) {\n  release(\n    identifier: $identifier\n    version: $version\n    id: $id\n    clientId: $clientId\n  ) {\n    ...DetailRelease\n    __typename\n  }\n}"
+        document = "fragment ListClient on Client {\n  id\n  user {\n    id\n    username\n    __typename\n  }\n  name\n  kind\n  release {\n    version\n    logo {\n      presignedUrl\n      __typename\n    }\n    app {\n      id\n      identifier\n      logo {\n        presignedUrl\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment ListApp on App {\n  id\n  identifier\n  logo {\n    presignedUrl\n    __typename\n  }\n  __typename\n}\n\nfragment DetailRelease on Release {\n  id\n  version\n  logo {\n    presignedUrl\n    __typename\n  }\n  app {\n    ...ListApp\n    __typename\n  }\n  clients {\n    ...ListClient\n    __typename\n  }\n  __typename\n}\n\nquery Release($identifier: AppIdentifier, $version: Version, $id: ID, $clientId: ID) {\n  release(\n    identifier: $identifier\n    version: $version\n    id: $id\n    clientId: $clientId\n  ) {\n    ...DetailRelease\n    __typename\n  }\n}"
 
 
 class DetailReleaseQuery(BaseModel):
@@ -2283,11 +2212,12 @@ class DetailReleaseQuery(BaseModel):
         """Arguments for DetailRelease"""
 
         id: ID
+        model_config = ConfigDict(populate_by_name=True)
 
     class Meta:
         """Meta class for DetailRelease"""
 
-        document = "fragment ListApp on App {\n  id\n  identifier\n  logo {\n    presignedUrl\n    __typename\n  }\n  __typename\n}\n\nfragment ListClient on Client {\n  id\n  user {\n    id\n    username\n    __typename\n  }\n  name\n  kind\n  release {\n    version\n    logo {\n      presignedUrl\n      __typename\n    }\n    app {\n      id\n      identifier\n      logo {\n        presignedUrl\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment DetailRelease on Release {\n  id\n  version\n  logo {\n    presignedUrl\n    __typename\n  }\n  app {\n    ...ListApp\n    __typename\n  }\n  clients {\n    ...ListClient\n    __typename\n  }\n  __typename\n}\n\nquery DetailRelease($id: ID!) {\n  release(id: $id) {\n    ...DetailRelease\n    __typename\n  }\n}"
+        document = "fragment ListClient on Client {\n  id\n  user {\n    id\n    username\n    __typename\n  }\n  name\n  kind\n  release {\n    version\n    logo {\n      presignedUrl\n      __typename\n    }\n    app {\n      id\n      identifier\n      logo {\n        presignedUrl\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment ListApp on App {\n  id\n  identifier\n  logo {\n    presignedUrl\n    __typename\n  }\n  __typename\n}\n\nfragment DetailRelease on Release {\n  id\n  version\n  logo {\n    presignedUrl\n    __typename\n  }\n  app {\n    ...ListApp\n    __typename\n  }\n  clients {\n    ...ListClient\n    __typename\n  }\n  __typename\n}\n\nquery DetailRelease($id: ID!) {\n  release(id: $id) {\n    ...DetailRelease\n    __typename\n  }\n}"
 
 
 class LayersQuery(BaseModel):
@@ -2300,6 +2230,7 @@ class LayersQuery(BaseModel):
 
         filters: Optional[LayerFilter] = Field(default=None)
         pagination: Optional[OffsetPaginationInput] = Field(default=None)
+        model_config = ConfigDict(populate_by_name=True)
 
     class Meta:
         """Meta class for Layers"""
@@ -2316,11 +2247,12 @@ class DetailLayerQuery(BaseModel):
         """Arguments for DetailLayer"""
 
         id: ID
+        model_config = ConfigDict(populate_by_name=True)
 
     class Meta:
         """Meta class for DetailLayer"""
 
-        document = "fragment ListUser on User {\n  username\n  firstName\n  lastName\n  email\n  avatar\n  id\n  __typename\n}\n\nfragment ListServiceInstance on ServiceInstance {\n  id\n  backend\n  identifier\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  layer {\n    id\n    name\n    __typename\n  }\n  __typename\n}\n\nfragment Layer on Layer {\n  id\n  name\n  description\n  logo {\n    presignedUrl\n    __typename\n  }\n  instances {\n    ...ListServiceInstance\n    __typename\n  }\n  __typename\n}\n\nquery DetailLayer($id: ID!) {\n  layer(id: $id) {\n    ...Layer\n    __typename\n  }\n}"
+        document = "fragment ListUser on User {\n  username\n  firstName\n  lastName\n  email\n  avatar\n  id\n  __typename\n}\n\nfragment ListServiceInstance on ServiceInstance {\n  id\n  identifier\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  __typename\n}\n\nfragment Layer on Layer {\n  id\n  name\n  description\n  logo {\n    presignedUrl\n    __typename\n  }\n  instances {\n    ...ListServiceInstance\n    __typename\n  }\n  __typename\n}\n\nquery DetailLayer($id: ID!) {\n  layer(id: $id) {\n    ...Layer\n    __typename\n  }\n}"
 
 
 class GlobalSearchQuery(BaseModel):
@@ -2336,6 +2268,7 @@ class GlobalSearchQuery(BaseModel):
         no_users: bool = Field(alias="noUsers")
         no_groups: bool = Field(alias="noGroups")
         pagination: Optional[OffsetPaginationInput] = Field(default=None)
+        model_config = ConfigDict(populate_by_name=True)
 
     class Meta:
         """Meta class for GlobalSearch"""
@@ -2353,6 +2286,7 @@ class AppsQuery(BaseModel):
 
         filters: Optional[AppFilter] = Field(default=None)
         pagination: Optional[OffsetPaginationInput] = Field(default=None)
+        model_config = ConfigDict(populate_by_name=True)
 
     class Meta:
         """Meta class for Apps"""
@@ -2371,6 +2305,7 @@ class AppQuery(BaseModel):
         identifier: Optional[str] = Field(default=None)
         id: Optional[ID] = Field(default=None)
         client_id: Optional[ID] = Field(alias="clientId", default=None)
+        model_config = ConfigDict(populate_by_name=True)
 
     class Meta:
         """Meta class for App"""
@@ -2387,6 +2322,7 @@ class DetailAppQuery(BaseModel):
         """Arguments for DetailApp"""
 
         id: ID
+        model_config = ConfigDict(populate_by_name=True)
 
     class Meta:
         """Meta class for DetailApp"""
@@ -2404,6 +2340,7 @@ class ClientsQuery(BaseModel):
 
         filters: Optional[ClientFilter] = Field(default=None)
         pagination: Optional[OffsetPaginationInput] = Field(default=None)
+        model_config = ConfigDict(populate_by_name=True)
 
     class Meta:
         """Meta class for Clients"""
@@ -2420,11 +2357,12 @@ class DetailClientQuery(BaseModel):
         """Arguments for DetailClient"""
 
         id: ID
+        model_config = ConfigDict(populate_by_name=True)
 
     class Meta:
         """Meta class for DetailClient"""
 
-        document = "fragment ListUser on User {\n  username\n  firstName\n  lastName\n  email\n  avatar\n  id\n  __typename\n}\n\nfragment ListServiceInstance on ServiceInstance {\n  id\n  backend\n  identifier\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  layer {\n    id\n    name\n    __typename\n  }\n  __typename\n}\n\nfragment ListClient on Client {\n  id\n  user {\n    id\n    username\n    __typename\n  }\n  name\n  kind\n  release {\n    version\n    logo {\n      presignedUrl\n      __typename\n    }\n    app {\n      id\n      identifier\n      logo {\n        presignedUrl\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment ListApp on App {\n  id\n  identifier\n  logo {\n    presignedUrl\n    __typename\n  }\n  __typename\n}\n\nfragment ListRelease on Release {\n  id\n  version\n  logo {\n    presignedUrl\n    __typename\n  }\n  app {\n    ...ListApp\n    __typename\n  }\n  __typename\n}\n\nfragment ListServiceInstanceMapping on ServiceInstanceMapping {\n  id\n  key\n  instance {\n    ...ListServiceInstance\n    __typename\n  }\n  client {\n    ...ListClient\n    __typename\n  }\n  optional\n  __typename\n}\n\nfragment DetailClient on Client {\n  id\n  token\n  name\n  user {\n    id\n    username\n    __typename\n  }\n  kind\n  release {\n    ...ListRelease\n    __typename\n  }\n  logo {\n    presignedUrl\n    __typename\n  }\n  oauth2Client {\n    clientId\n    __typename\n  }\n  mappings {\n    ...ListServiceInstanceMapping\n    __typename\n  }\n  __typename\n}\n\nquery DetailClient($id: ID!) {\n  client(id: $id) {\n    ...DetailClient\n    __typename\n  }\n}"
+        document = "fragment ListUser on User {\n  username\n  firstName\n  lastName\n  email\n  avatar\n  id\n  __typename\n}\n\nfragment ListApp on App {\n  id\n  identifier\n  logo {\n    presignedUrl\n    __typename\n  }\n  __typename\n}\n\nfragment ListServiceInstance on ServiceInstance {\n  id\n  identifier\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  __typename\n}\n\nfragment ListClient on Client {\n  id\n  user {\n    id\n    username\n    __typename\n  }\n  name\n  kind\n  release {\n    version\n    logo {\n      presignedUrl\n      __typename\n    }\n    app {\n      id\n      identifier\n      logo {\n        presignedUrl\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment ListRelease on Release {\n  id\n  version\n  logo {\n    presignedUrl\n    __typename\n  }\n  app {\n    ...ListApp\n    __typename\n  }\n  __typename\n}\n\nfragment ListServiceInstanceMapping on ServiceInstanceMapping {\n  id\n  key\n  instance {\n    ...ListServiceInstance\n    __typename\n  }\n  client {\n    ...ListClient\n    __typename\n  }\n  optional\n  __typename\n}\n\nfragment DetailClient on Client {\n  id\n  token\n  name\n  user {\n    id\n    username\n    __typename\n  }\n  kind\n  release {\n    ...ListRelease\n    __typename\n  }\n  logo {\n    presignedUrl\n    __typename\n  }\n  oauth2Client {\n    clientId\n    __typename\n  }\n  mappings {\n    ...ListServiceInstanceMapping\n    __typename\n  }\n  __typename\n}\n\nquery DetailClient($id: ID!) {\n  client(id: $id) {\n    ...DetailClient\n    __typename\n  }\n}"
 
 
 class MyManagedClientsQuery(BaseModel):
@@ -2436,6 +2374,7 @@ class MyManagedClientsQuery(BaseModel):
         """Arguments for MyManagedClients"""
 
         kind: ClientKind
+        model_config = ConfigDict(populate_by_name=True)
 
     class Meta:
         """Meta class for MyManagedClients"""
@@ -2452,11 +2391,12 @@ class ClientQuery(BaseModel):
         """Arguments for Client"""
 
         client_id: ID = Field(alias="clientId")
+        model_config = ConfigDict(populate_by_name=True)
 
     class Meta:
         """Meta class for Client"""
 
-        document = "fragment ListUser on User {\n  username\n  firstName\n  lastName\n  email\n  avatar\n  id\n  __typename\n}\n\nfragment ListServiceInstance on ServiceInstance {\n  id\n  backend\n  identifier\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  layer {\n    id\n    name\n    __typename\n  }\n  __typename\n}\n\nfragment ListClient on Client {\n  id\n  user {\n    id\n    username\n    __typename\n  }\n  name\n  kind\n  release {\n    version\n    logo {\n      presignedUrl\n      __typename\n    }\n    app {\n      id\n      identifier\n      logo {\n        presignedUrl\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment ListApp on App {\n  id\n  identifier\n  logo {\n    presignedUrl\n    __typename\n  }\n  __typename\n}\n\nfragment ListRelease on Release {\n  id\n  version\n  logo {\n    presignedUrl\n    __typename\n  }\n  app {\n    ...ListApp\n    __typename\n  }\n  __typename\n}\n\nfragment ListServiceInstanceMapping on ServiceInstanceMapping {\n  id\n  key\n  instance {\n    ...ListServiceInstance\n    __typename\n  }\n  client {\n    ...ListClient\n    __typename\n  }\n  optional\n  __typename\n}\n\nfragment DetailClient on Client {\n  id\n  token\n  name\n  user {\n    id\n    username\n    __typename\n  }\n  kind\n  release {\n    ...ListRelease\n    __typename\n  }\n  logo {\n    presignedUrl\n    __typename\n  }\n  oauth2Client {\n    clientId\n    __typename\n  }\n  mappings {\n    ...ListServiceInstanceMapping\n    __typename\n  }\n  __typename\n}\n\nquery Client($clientId: ID!) {\n  client(clientId: $clientId) {\n    ...DetailClient\n    __typename\n  }\n}"
+        document = "fragment ListUser on User {\n  username\n  firstName\n  lastName\n  email\n  avatar\n  id\n  __typename\n}\n\nfragment ListApp on App {\n  id\n  identifier\n  logo {\n    presignedUrl\n    __typename\n  }\n  __typename\n}\n\nfragment ListServiceInstance on ServiceInstance {\n  id\n  identifier\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  __typename\n}\n\nfragment ListClient on Client {\n  id\n  user {\n    id\n    username\n    __typename\n  }\n  name\n  kind\n  release {\n    version\n    logo {\n      presignedUrl\n      __typename\n    }\n    app {\n      id\n      identifier\n      logo {\n        presignedUrl\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment ListRelease on Release {\n  id\n  version\n  logo {\n    presignedUrl\n    __typename\n  }\n  app {\n    ...ListApp\n    __typename\n  }\n  __typename\n}\n\nfragment ListServiceInstanceMapping on ServiceInstanceMapping {\n  id\n  key\n  instance {\n    ...ListServiceInstance\n    __typename\n  }\n  client {\n    ...ListClient\n    __typename\n  }\n  optional\n  __typename\n}\n\nfragment DetailClient on Client {\n  id\n  token\n  name\n  user {\n    id\n    username\n    __typename\n  }\n  kind\n  release {\n    ...ListRelease\n    __typename\n  }\n  logo {\n    presignedUrl\n    __typename\n  }\n  oauth2Client {\n    clientId\n    __typename\n  }\n  mappings {\n    ...ListServiceInstanceMapping\n    __typename\n  }\n  __typename\n}\n\nquery Client($clientId: ID!) {\n  client(clientId: $clientId) {\n    ...DetailClient\n    __typename\n  }\n}"
 
 
 class ScopesQueryScopes(BaseModel):
@@ -2481,6 +2421,8 @@ class ScopesQuery(BaseModel):
 
     class Arguments(BaseModel):
         """Arguments for Scopes"""
+
+        model_config = ConfigDict(populate_by_name=True)
 
     class Meta:
         """Meta class for Scopes"""
@@ -2509,6 +2451,8 @@ class ScopesOptionsQuery(BaseModel):
     class Arguments(BaseModel):
         """Arguments for ScopesOptions"""
 
+        model_config = ConfigDict(populate_by_name=True)
+
     class Meta:
         """Meta class for ScopesOptions"""
 
@@ -2525,6 +2469,7 @@ class RedeemTokensQuery(BaseModel):
 
         filters: Optional[RedeemTokenFilter] = Field(default=None)
         pagination: Optional[OffsetPaginationInput] = Field(default=None)
+        model_config = ConfigDict(populate_by_name=True)
 
     class Meta:
         """Meta class for RedeemTokens"""
@@ -2556,6 +2501,7 @@ class GroupOptionsQuery(BaseModel):
 
         search: Optional[str] = Field(default=None)
         values: Optional[List[ID]] = Field(default=None)
+        model_config = ConfigDict(populate_by_name=True)
 
     class Meta:
         """Meta class for GroupOptions"""
@@ -2572,11 +2518,12 @@ class DetailGroupQuery(BaseModel):
         """Arguments for DetailGroup"""
 
         id: ID
+        model_config = ConfigDict(populate_by_name=True)
 
     class Meta:
         """Meta class for DetailGroup"""
 
-        document = "fragment GroupProfile on GroupProfile {\n  id\n  name\n  avatar {\n    presignedUrl\n    __typename\n  }\n  __typename\n}\n\nfragment ListUser on User {\n  username\n  firstName\n  lastName\n  email\n  avatar\n  id\n  __typename\n}\n\nfragment DetailGroup on Group {\n  id\n  name\n  users {\n    ...ListUser\n    __typename\n  }\n  profile {\n    ...GroupProfile\n    __typename\n  }\n  __typename\n}\n\nquery DetailGroup($id: ID!) {\n  group(id: $id) {\n    ...DetailGroup\n    __typename\n  }\n}"
+        document = "fragment ListUser on User {\n  username\n  firstName\n  lastName\n  email\n  avatar\n  id\n  __typename\n}\n\nfragment GroupProfile on GroupProfile {\n  id\n  name\n  avatar {\n    presignedUrl\n    __typename\n  }\n  __typename\n}\n\nfragment DetailGroup on Group {\n  id\n  name\n  users {\n    ...ListUser\n    __typename\n  }\n  profile {\n    ...GroupProfile\n    __typename\n  }\n  __typename\n}\n\nquery DetailGroup($id: ID!) {\n  group(id: $id) {\n    ...DetailGroup\n    __typename\n  }\n}"
 
 
 class GroupsQuery(BaseModel):
@@ -2589,6 +2536,7 @@ class GroupsQuery(BaseModel):
 
         filters: Optional[GroupFilter] = Field(default=None)
         pagination: Optional[OffsetPaginationInput] = Field(default=None)
+        model_config = ConfigDict(populate_by_name=True)
 
     class Meta:
         """Meta class for Groups"""
@@ -2605,6 +2553,7 @@ class MyStashesQuery(BaseModel):
         """Arguments for MyStashes"""
 
         pagination: Optional[OffsetPaginationInput] = Field(default=None)
+        model_config = ConfigDict(populate_by_name=True)
 
     class Meta:
         """Meta class for MyStashes"""
@@ -2619,6 +2568,8 @@ class MeQuery(BaseModel):
 
     class Arguments(BaseModel):
         """Arguments for Me"""
+
+        model_config = ConfigDict(populate_by_name=True)
 
     class Meta:
         """Meta class for Me"""
@@ -2635,6 +2586,7 @@ class UserQuery(BaseModel):
         """Arguments for User"""
 
         id: ID
+        model_config = ConfigDict(populate_by_name=True)
 
     class Meta:
         """Meta class for User"""
@@ -2651,6 +2603,7 @@ class DetailUserQuery(BaseModel):
         """Arguments for DetailUser"""
 
         id: ID
+        model_config = ConfigDict(populate_by_name=True)
 
     class Meta:
         """Meta class for DetailUser"""
@@ -2668,6 +2621,7 @@ class UsersQuery(BaseModel):
 
         filters: Optional[UserFilter] = Field(default=None)
         pagination: Optional[OffsetPaginationInput] = Field(default=None)
+        model_config = ConfigDict(populate_by_name=True)
 
     class Meta:
         """Meta class for Users"""
@@ -2705,6 +2659,7 @@ class UserOptionsQuery(BaseModel):
 
         search: Optional[str] = Field(default=None)
         values: Optional[List[ID]] = Field(default=None)
+        model_config = ConfigDict(populate_by_name=True)
 
     class Meta:
         """Meta class for UserOptions"""
@@ -2719,6 +2674,8 @@ class ProfileQuery(BaseModel):
 
     class Arguments(BaseModel):
         """Arguments for Profile"""
+
+        model_config = ConfigDict(populate_by_name=True)
 
     class Meta:
         """Meta class for Profile"""
@@ -2736,11 +2693,12 @@ class CommentsForQuery(BaseModel):
 
         object: ID
         identifier: str
+        model_config = ConfigDict(populate_by_name=True)
 
     class Meta:
         """Meta class for CommentsFor"""
 
-        document = "fragment Leaf on LeafDescendant {\n  bold\n  italic\n  code\n  text\n  __typename\n}\n\nfragment Paragraph on ParagraphDescendant {\n  size\n  __typename\n}\n\nfragment Mention on MentionDescendant {\n  user {\n    ...CommentUser\n    __typename\n  }\n  __typename\n}\n\nfragment SubthreadComment on Comment {\n  user {\n    ...CommentUser\n    __typename\n  }\n  parent {\n    id\n    __typename\n  }\n  createdAt\n  descendants {\n    ...Descendant\n    __typename\n  }\n  __typename\n}\n\nfragment CommentUser on User {\n  id\n  username\n  avatar\n  profile {\n    avatar {\n      presignedUrl\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment Descendant on Descendant {\n  kind\n  children {\n    kind\n    children {\n      kind\n      unsafeChildren\n      ...Leaf\n      ...Mention\n      ...Paragraph\n      __typename\n    }\n    ...Leaf\n    ...Mention\n    ...Paragraph\n    __typename\n  }\n  ...Mention\n  ...Paragraph\n  ...Leaf\n  __typename\n}\n\nfragment ListComment on Comment {\n  user {\n    ...CommentUser\n    __typename\n  }\n  parent {\n    id\n    __typename\n  }\n  descendants {\n    ...Descendant\n    __typename\n  }\n  resolved\n  resolvedBy {\n    ...CommentUser\n    __typename\n  }\n  id\n  createdAt\n  children {\n    ...SubthreadComment\n    __typename\n  }\n  __typename\n}\n\nquery CommentsFor($object: ID!, $identifier: Identifier!) {\n  commentsFor(identifier: $identifier, object: $object) {\n    ...ListComment\n    __typename\n  }\n}"
+        document = "fragment Leaf on LeafDescendant {\n  bold\n  italic\n  code\n  text\n  __typename\n}\n\nfragment Mention on MentionDescendant {\n  user {\n    ...CommentUser\n    __typename\n  }\n  __typename\n}\n\nfragment Paragraph on ParagraphDescendant {\n  size\n  __typename\n}\n\nfragment CommentUser on User {\n  id\n  username\n  avatar\n  profile {\n    avatar {\n      presignedUrl\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment SubthreadComment on Comment {\n  user {\n    ...CommentUser\n    __typename\n  }\n  parent {\n    id\n    __typename\n  }\n  createdAt\n  descendants {\n    ...Descendant\n    __typename\n  }\n  __typename\n}\n\nfragment Descendant on Descendant {\n  kind\n  children {\n    kind\n    children {\n      kind\n      unsafeChildren\n      ...Leaf\n      ...Mention\n      ...Paragraph\n      __typename\n    }\n    ...Leaf\n    ...Mention\n    ...Paragraph\n    __typename\n  }\n  ...Mention\n  ...Paragraph\n  ...Leaf\n  __typename\n}\n\nfragment ListComment on Comment {\n  user {\n    ...CommentUser\n    __typename\n  }\n  parent {\n    id\n    __typename\n  }\n  descendants {\n    ...Descendant\n    __typename\n  }\n  resolved\n  resolvedBy {\n    ...CommentUser\n    __typename\n  }\n  id\n  createdAt\n  children {\n    ...SubthreadComment\n    __typename\n  }\n  __typename\n}\n\nquery CommentsFor($object: ID!, $identifier: Identifier!) {\n  commentsFor(identifier: $identifier, object: $object) {\n    ...ListComment\n    __typename\n  }\n}"
 
 
 class MyMentionsQuery(BaseModel):
@@ -2751,10 +2709,12 @@ class MyMentionsQuery(BaseModel):
     class Arguments(BaseModel):
         """Arguments for MyMentions"""
 
+        model_config = ConfigDict(populate_by_name=True)
+
     class Meta:
         """Meta class for MyMentions"""
 
-        document = "fragment Leaf on LeafDescendant {\n  bold\n  italic\n  code\n  text\n  __typename\n}\n\nfragment Paragraph on ParagraphDescendant {\n  size\n  __typename\n}\n\nfragment Mention on MentionDescendant {\n  user {\n    ...CommentUser\n    __typename\n  }\n  __typename\n}\n\nfragment SubthreadComment on Comment {\n  user {\n    ...CommentUser\n    __typename\n  }\n  parent {\n    id\n    __typename\n  }\n  createdAt\n  descendants {\n    ...Descendant\n    __typename\n  }\n  __typename\n}\n\nfragment CommentUser on User {\n  id\n  username\n  avatar\n  profile {\n    avatar {\n      presignedUrl\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment Descendant on Descendant {\n  kind\n  children {\n    kind\n    children {\n      kind\n      unsafeChildren\n      ...Leaf\n      ...Mention\n      ...Paragraph\n      __typename\n    }\n    ...Leaf\n    ...Mention\n    ...Paragraph\n    __typename\n  }\n  ...Mention\n  ...Paragraph\n  ...Leaf\n  __typename\n}\n\nfragment MentionComment on Comment {\n  user {\n    ...CommentUser\n    __typename\n  }\n  parent {\n    id\n    __typename\n  }\n  descendants {\n    ...Descendant\n    __typename\n  }\n  id\n  createdAt\n  children {\n    ...SubthreadComment\n    __typename\n  }\n  mentions {\n    ...CommentUser\n    __typename\n  }\n  resolved\n  resolvedBy {\n    ...CommentUser\n    __typename\n  }\n  object\n  identifier\n  __typename\n}\n\nquery MyMentions {\n  myMentions {\n    ...MentionComment\n    __typename\n  }\n}"
+        document = "fragment Leaf on LeafDescendant {\n  bold\n  italic\n  code\n  text\n  __typename\n}\n\nfragment Mention on MentionDescendant {\n  user {\n    ...CommentUser\n    __typename\n  }\n  __typename\n}\n\nfragment Paragraph on ParagraphDescendant {\n  size\n  __typename\n}\n\nfragment CommentUser on User {\n  id\n  username\n  avatar\n  profile {\n    avatar {\n      presignedUrl\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment SubthreadComment on Comment {\n  user {\n    ...CommentUser\n    __typename\n  }\n  parent {\n    id\n    __typename\n  }\n  createdAt\n  descendants {\n    ...Descendant\n    __typename\n  }\n  __typename\n}\n\nfragment Descendant on Descendant {\n  kind\n  children {\n    kind\n    children {\n      kind\n      unsafeChildren\n      ...Leaf\n      ...Mention\n      ...Paragraph\n      __typename\n    }\n    ...Leaf\n    ...Mention\n    ...Paragraph\n    __typename\n  }\n  ...Mention\n  ...Paragraph\n  ...Leaf\n  __typename\n}\n\nfragment MentionComment on Comment {\n  user {\n    ...CommentUser\n    __typename\n  }\n  parent {\n    id\n    __typename\n  }\n  descendants {\n    ...Descendant\n    __typename\n  }\n  id\n  createdAt\n  children {\n    ...SubthreadComment\n    __typename\n  }\n  mentions {\n    ...CommentUser\n    __typename\n  }\n  resolved\n  resolvedBy {\n    ...CommentUser\n    __typename\n  }\n  object\n  identifier\n  __typename\n}\n\nquery MyMentions {\n  myMentions {\n    ...MentionComment\n    __typename\n  }\n}"
 
 
 class DetailCommentQuery(BaseModel):
@@ -2766,11 +2726,12 @@ class DetailCommentQuery(BaseModel):
         """Arguments for DetailComment"""
 
         id: ID
+        model_config = ConfigDict(populate_by_name=True)
 
     class Meta:
         """Meta class for DetailComment"""
 
-        document = "fragment Leaf on LeafDescendant {\n  bold\n  italic\n  code\n  text\n  __typename\n}\n\nfragment Paragraph on ParagraphDescendant {\n  size\n  __typename\n}\n\nfragment Mention on MentionDescendant {\n  user {\n    ...CommentUser\n    __typename\n  }\n  __typename\n}\n\nfragment SubthreadComment on Comment {\n  user {\n    ...CommentUser\n    __typename\n  }\n  parent {\n    id\n    __typename\n  }\n  createdAt\n  descendants {\n    ...Descendant\n    __typename\n  }\n  __typename\n}\n\nfragment CommentUser on User {\n  id\n  username\n  avatar\n  profile {\n    avatar {\n      presignedUrl\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment Descendant on Descendant {\n  kind\n  children {\n    kind\n    children {\n      kind\n      unsafeChildren\n      ...Leaf\n      ...Mention\n      ...Paragraph\n      __typename\n    }\n    ...Leaf\n    ...Mention\n    ...Paragraph\n    __typename\n  }\n  ...Mention\n  ...Paragraph\n  ...Leaf\n  __typename\n}\n\nfragment DetailComment on Comment {\n  user {\n    ...CommentUser\n    __typename\n  }\n  parent {\n    id\n    __typename\n  }\n  descendants {\n    ...Descendant\n    __typename\n  }\n  id\n  resolved\n  resolvedBy {\n    ...CommentUser\n    __typename\n  }\n  createdAt\n  children {\n    ...SubthreadComment\n    __typename\n  }\n  mentions {\n    ...CommentUser\n    __typename\n  }\n  object\n  identifier\n  __typename\n}\n\nquery DetailComment($id: ID!) {\n  comment(id: $id) {\n    ...DetailComment\n    __typename\n  }\n}"
+        document = "fragment Leaf on LeafDescendant {\n  bold\n  italic\n  code\n  text\n  __typename\n}\n\nfragment Mention on MentionDescendant {\n  user {\n    ...CommentUser\n    __typename\n  }\n  __typename\n}\n\nfragment Paragraph on ParagraphDescendant {\n  size\n  __typename\n}\n\nfragment CommentUser on User {\n  id\n  username\n  avatar\n  profile {\n    avatar {\n      presignedUrl\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment SubthreadComment on Comment {\n  user {\n    ...CommentUser\n    __typename\n  }\n  parent {\n    id\n    __typename\n  }\n  createdAt\n  descendants {\n    ...Descendant\n    __typename\n  }\n  __typename\n}\n\nfragment Descendant on Descendant {\n  kind\n  children {\n    kind\n    children {\n      kind\n      unsafeChildren\n      ...Leaf\n      ...Mention\n      ...Paragraph\n      __typename\n    }\n    ...Leaf\n    ...Mention\n    ...Paragraph\n    __typename\n  }\n  ...Mention\n  ...Paragraph\n  ...Leaf\n  __typename\n}\n\nfragment DetailComment on Comment {\n  user {\n    ...CommentUser\n    __typename\n  }\n  parent {\n    id\n    __typename\n  }\n  descendants {\n    ...Descendant\n    __typename\n  }\n  id\n  resolved\n  resolvedBy {\n    ...CommentUser\n    __typename\n  }\n  createdAt\n  children {\n    ...SubthreadComment\n    __typename\n  }\n  mentions {\n    ...CommentUser\n    __typename\n  }\n  object\n  identifier\n  __typename\n}\n\nquery DetailComment($id: ID!) {\n  comment(id: $id) {\n    ...DetailComment\n    __typename\n  }\n}"
 
 
 class WatchMentionsSubscription(BaseModel):
@@ -2781,10 +2742,12 @@ class WatchMentionsSubscription(BaseModel):
     class Arguments(BaseModel):
         """Arguments for WatchMentions"""
 
+        model_config = ConfigDict(populate_by_name=True)
+
     class Meta:
         """Meta class for WatchMentions"""
 
-        document = "fragment Leaf on LeafDescendant {\n  bold\n  italic\n  code\n  text\n  __typename\n}\n\nfragment Paragraph on ParagraphDescendant {\n  size\n  __typename\n}\n\nfragment Mention on MentionDescendant {\n  user {\n    ...CommentUser\n    __typename\n  }\n  __typename\n}\n\nfragment SubthreadComment on Comment {\n  user {\n    ...CommentUser\n    __typename\n  }\n  parent {\n    id\n    __typename\n  }\n  createdAt\n  descendants {\n    ...Descendant\n    __typename\n  }\n  __typename\n}\n\nfragment CommentUser on User {\n  id\n  username\n  avatar\n  profile {\n    avatar {\n      presignedUrl\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment Descendant on Descendant {\n  kind\n  children {\n    kind\n    children {\n      kind\n      unsafeChildren\n      ...Leaf\n      ...Mention\n      ...Paragraph\n      __typename\n    }\n    ...Leaf\n    ...Mention\n    ...Paragraph\n    __typename\n  }\n  ...Mention\n  ...Paragraph\n  ...Leaf\n  __typename\n}\n\nfragment MentionComment on Comment {\n  user {\n    ...CommentUser\n    __typename\n  }\n  parent {\n    id\n    __typename\n  }\n  descendants {\n    ...Descendant\n    __typename\n  }\n  id\n  createdAt\n  children {\n    ...SubthreadComment\n    __typename\n  }\n  mentions {\n    ...CommentUser\n    __typename\n  }\n  resolved\n  resolvedBy {\n    ...CommentUser\n    __typename\n  }\n  object\n  identifier\n  __typename\n}\n\nsubscription WatchMentions {\n  mentions {\n    ...MentionComment\n    __typename\n  }\n}"
+        document = "fragment Leaf on LeafDescendant {\n  bold\n  italic\n  code\n  text\n  __typename\n}\n\nfragment Mention on MentionDescendant {\n  user {\n    ...CommentUser\n    __typename\n  }\n  __typename\n}\n\nfragment Paragraph on ParagraphDescendant {\n  size\n  __typename\n}\n\nfragment CommentUser on User {\n  id\n  username\n  avatar\n  profile {\n    avatar {\n      presignedUrl\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment SubthreadComment on Comment {\n  user {\n    ...CommentUser\n    __typename\n  }\n  parent {\n    id\n    __typename\n  }\n  createdAt\n  descendants {\n    ...Descendant\n    __typename\n  }\n  __typename\n}\n\nfragment Descendant on Descendant {\n  kind\n  children {\n    kind\n    children {\n      kind\n      unsafeChildren\n      ...Leaf\n      ...Mention\n      ...Paragraph\n      __typename\n    }\n    ...Leaf\n    ...Mention\n    ...Paragraph\n    __typename\n  }\n  ...Mention\n  ...Paragraph\n  ...Leaf\n  __typename\n}\n\nfragment MentionComment on Comment {\n  user {\n    ...CommentUser\n    __typename\n  }\n  parent {\n    id\n    __typename\n  }\n  descendants {\n    ...Descendant\n    __typename\n  }\n  id\n  createdAt\n  children {\n    ...SubthreadComment\n    __typename\n  }\n  mentions {\n    ...CommentUser\n    __typename\n  }\n  resolved\n  resolvedBy {\n    ...CommentUser\n    __typename\n  }\n  object\n  identifier\n  __typename\n}\n\nsubscription WatchMentions {\n  mentions {\n    ...MentionComment\n    __typename\n  }\n}"
 
 
 async def aupdate_service_instance(
@@ -2798,7 +2761,7 @@ async def aupdate_service_instance(
     """UpdateServiceInstance
 
 
-    Arguments:
+    Args:
         allowed_users: The `ID` scalar type represents a unique identifier, often used to refetch an object or as key for a cache. The ID type appears in a JSON response as a String; however, it is not intended to be human-readable. When expected as an input type, any string (such as `"4"`) or integer (such as `4`) input value will be accepted as an ID. (required) (list)
         allowed_groups: The `ID` scalar type represents a unique identifier, often used to refetch an object or as key for a cache. The ID type appears in a JSON response as a String; however, it is not intended to be human-readable. When expected as an input type, any string (such as `"4"`) or integer (such as `4`) input value will be accepted as an ID. (required) (list)
         denied_groups: The `ID` scalar type represents a unique identifier, often used to refetch an object or as key for a cache. The ID type appears in a JSON response as a String; however, it is not intended to be human-readable. When expected as an input type, any string (such as `"4"`) or integer (such as `4`) input value will be accepted as an ID. (required) (list)
@@ -2837,7 +2800,7 @@ def update_service_instance(
     """UpdateServiceInstance
 
 
-    Arguments:
+    Args:
         allowed_users: The `ID` scalar type represents a unique identifier, often used to refetch an object or as key for a cache. The ID type appears in a JSON response as a String; however, it is not intended to be human-readable. When expected as an input type, any string (such as `"4"`) or integer (such as `4`) input value will be accepted as an ID. (required) (list)
         allowed_groups: The `ID` scalar type represents a unique identifier, often used to refetch an object or as key for a cache. The ID type appears in a JSON response as a String; however, it is not intended to be human-readable. When expected as an input type, any string (such as `"4"`) or integer (such as `4`) input value will be accepted as an ID. (required) (list)
         denied_groups: The `ID` scalar type represents a unique identifier, often used to refetch an object or as key for a cache. The ID type appears in a JSON response as a String; however, it is not intended to be human-readable. When expected as an input type, any string (such as `"4"`) or integer (such as `4`) input value will be accepted as an ID. (required) (list)
@@ -2863,13 +2826,95 @@ def update_service_instance(
     ).update_service_instance
 
 
+async def acreate_service_instance(
+    identifier: str,
+    service: ID,
+    allowed_users: Optional[Iterable[ID]] = None,
+    allowed_groups: Optional[Iterable[ID]] = None,
+    denied_groups: Optional[Iterable[ID]] = None,
+    denied_users: Optional[Iterable[ID]] = None,
+    rath: Optional[UnlokRath] = None,
+) -> ServiceInstance:
+    """CreateServiceInstance
+
+
+    Args:
+        identifier: The `String` scalar type represents textual data, represented as UTF-8 character sequences. The String type is most often used by GraphQL to represent free-form human-readable text. (required)
+        service: The `ID` scalar type represents a unique identifier, often used to refetch an object or as key for a cache. The ID type appears in a JSON response as a String; however, it is not intended to be human-readable. When expected as an input type, any string (such as `"4"`) or integer (such as `4`) input value will be accepted as an ID. (required)
+        allowed_users: The `ID` scalar type represents a unique identifier, often used to refetch an object or as key for a cache. The ID type appears in a JSON response as a String; however, it is not intended to be human-readable. When expected as an input type, any string (such as `"4"`) or integer (such as `4`) input value will be accepted as an ID. (required) (list)
+        allowed_groups: The `ID` scalar type represents a unique identifier, often used to refetch an object or as key for a cache. The ID type appears in a JSON response as a String; however, it is not intended to be human-readable. When expected as an input type, any string (such as `"4"`) or integer (such as `4`) input value will be accepted as an ID. (required) (list)
+        denied_groups: The `ID` scalar type represents a unique identifier, often used to refetch an object or as key for a cache. The ID type appears in a JSON response as a String; however, it is not intended to be human-readable. When expected as an input type, any string (such as `"4"`) or integer (such as `4`) input value will be accepted as an ID. (required) (list)
+        denied_users: The `ID` scalar type represents a unique identifier, often used to refetch an object or as key for a cache. The ID type appears in a JSON response as a String; however, it is not intended to be human-readable. When expected as an input type, any string (such as `"4"`) or integer (such as `4`) input value will be accepted as an ID. (required) (list)
+        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+
+    Returns:
+        ServiceInstance
+    """
+    return (
+        await aexecute(
+            CreateServiceInstanceMutation,
+            {
+                "input": {
+                    "identifier": identifier,
+                    "service": service,
+                    "allowedUsers": allowed_users,
+                    "allowedGroups": allowed_groups,
+                    "deniedGroups": denied_groups,
+                    "deniedUsers": denied_users,
+                }
+            },
+            rath=rath,
+        )
+    ).create_service_instance
+
+
+def create_service_instance(
+    identifier: str,
+    service: ID,
+    allowed_users: Optional[Iterable[ID]] = None,
+    allowed_groups: Optional[Iterable[ID]] = None,
+    denied_groups: Optional[Iterable[ID]] = None,
+    denied_users: Optional[Iterable[ID]] = None,
+    rath: Optional[UnlokRath] = None,
+) -> ServiceInstance:
+    """CreateServiceInstance
+
+
+    Args:
+        identifier: The `String` scalar type represents textual data, represented as UTF-8 character sequences. The String type is most often used by GraphQL to represent free-form human-readable text. (required)
+        service: The `ID` scalar type represents a unique identifier, often used to refetch an object or as key for a cache. The ID type appears in a JSON response as a String; however, it is not intended to be human-readable. When expected as an input type, any string (such as `"4"`) or integer (such as `4`) input value will be accepted as an ID. (required)
+        allowed_users: The `ID` scalar type represents a unique identifier, often used to refetch an object or as key for a cache. The ID type appears in a JSON response as a String; however, it is not intended to be human-readable. When expected as an input type, any string (such as `"4"`) or integer (such as `4`) input value will be accepted as an ID. (required) (list)
+        allowed_groups: The `ID` scalar type represents a unique identifier, often used to refetch an object or as key for a cache. The ID type appears in a JSON response as a String; however, it is not intended to be human-readable. When expected as an input type, any string (such as `"4"`) or integer (such as `4`) input value will be accepted as an ID. (required) (list)
+        denied_groups: The `ID` scalar type represents a unique identifier, often used to refetch an object or as key for a cache. The ID type appears in a JSON response as a String; however, it is not intended to be human-readable. When expected as an input type, any string (such as `"4"`) or integer (such as `4`) input value will be accepted as an ID. (required) (list)
+        denied_users: The `ID` scalar type represents a unique identifier, often used to refetch an object or as key for a cache. The ID type appears in a JSON response as a String; however, it is not intended to be human-readable. When expected as an input type, any string (such as `"4"`) or integer (such as `4`) input value will be accepted as an ID. (required) (list)
+        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+
+    Returns:
+        ServiceInstance
+    """
+    return execute(
+        CreateServiceInstanceMutation,
+        {
+            "input": {
+                "identifier": identifier,
+                "service": service,
+                "allowedUsers": allowed_users,
+                "allowedGroups": allowed_groups,
+                "deniedGroups": denied_groups,
+                "deniedUsers": denied_users,
+            }
+        },
+        rath=rath,
+    ).create_service_instance
+
+
 async def arequest_media_upload(
     key: str, datalayer: str, rath: Optional[UnlokRath] = None
 ) -> PresignedPostCredentials:
     """RequestMediaUpload
 
 
-    Arguments:
+    Args:
         key (str): No description
         datalayer (str): No description
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
@@ -2890,7 +2935,7 @@ def request_media_upload(
     """RequestMediaUpload
 
 
-    Arguments:
+    Args:
         key (str): No description
         datalayer (str): No description
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
@@ -2903,50 +2948,6 @@ def request_media_upload(
     ).request_media_upload
 
 
-async def acreate_user_defined_service_instance(
-    identifier: str, values: Iterable[KeyValueInput], rath: Optional[UnlokRath] = None
-) -> UserDefinedServiceInstance:
-    """CreateUserDefinedServiceInstance
-
-
-    Arguments:
-        identifier: The `String` scalar type represents textual data, represented as UTF-8 character sequences. The String type is most often used by GraphQL to represent free-form human-readable text. (required)
-        values:  (required) (list) (required)
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
-
-    Returns:
-        UserDefinedServiceInstance
-    """
-    return (
-        await aexecute(
-            CreateUserDefinedServiceInstanceMutation,
-            {"input": {"identifier": identifier, "values": values}},
-            rath=rath,
-        )
-    ).create_user_defined_service_instance
-
-
-def create_user_defined_service_instance(
-    identifier: str, values: Iterable[KeyValueInput], rath: Optional[UnlokRath] = None
-) -> UserDefinedServiceInstance:
-    """CreateUserDefinedServiceInstance
-
-
-    Arguments:
-        identifier: The `String` scalar type represents textual data, represented as UTF-8 character sequences. The String type is most often used by GraphQL to represent free-form human-readable text. (required)
-        values:  (required) (list) (required)
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
-
-    Returns:
-        UserDefinedServiceInstance
-    """
-    return execute(
-        CreateUserDefinedServiceInstanceMutation,
-        {"input": {"identifier": identifier, "values": values}},
-        rath=rath,
-    ).create_user_defined_service_instance
-
-
 async def acreate_comment(
     object: ID,
     identifier: str,
@@ -2957,7 +2958,7 @@ async def acreate_comment(
     """CreateComment
 
 
-    Arguments:
+    Args:
         object (ID): No description
         identifier (str): No description
         descendants (List[DescendantInput]): No description
@@ -2991,7 +2992,7 @@ def create_comment(
     """CreateComment
 
 
-    Arguments:
+    Args:
         object (ID): No description
         identifier (str): No description
         descendants (List[DescendantInput]): No description
@@ -3019,7 +3020,7 @@ async def areply_to(
     """ReplyTo
 
 
-    Arguments:
+    Args:
         descendants (List[DescendantInput]): No description
         parent (ID): No description
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
@@ -3040,7 +3041,7 @@ def reply_to(
     """ReplyTo
 
 
-    Arguments:
+    Args:
         descendants (List[DescendantInput]): No description
         parent (ID): No description
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
@@ -3057,7 +3058,7 @@ async def aresolve_comment(id: ID, rath: Optional[UnlokRath] = None) -> ListComm
     """ResolveComment
 
 
-    Arguments:
+    Args:
         id (ID): No description
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
@@ -3073,7 +3074,7 @@ def resolve_comment(id: ID, rath: Optional[UnlokRath] = None) -> ListComment:
     """ResolveComment
 
 
-    Arguments:
+    Args:
         id (ID): No description
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
@@ -3093,7 +3094,7 @@ async def acreate_client(
     """CreateClient
 
 
-    Arguments:
+    Args:
         identifier (str): No description
         version (str): No description
         scopes (List[str]): No description
@@ -3127,7 +3128,7 @@ def create_client(
     """CreateClient
 
 
-    Arguments:
+    Args:
         identifier (str): No description
         version (str): No description
         scopes (List[str]): No description
@@ -3150,7 +3151,7 @@ async def acreate_group_profile(
     """CreateGroupProfile
 
 
-    Arguments:
+    Args:
         group: The `ID` scalar type represents a unique identifier, often used to refetch an object or as key for a cache. The ID type appears in a JSON response as a String; however, it is not intended to be human-readable. When expected as an input type, any string (such as `"4"`) or integer (such as `4`) input value will be accepted as an ID. (required)
         name: The `String` scalar type represents textual data, represented as UTF-8 character sequences. The String type is most often used by GraphQL to represent free-form human-readable text. (required)
         avatar: The `ID` scalar type represents a unique identifier, often used to refetch an object or as key for a cache. The ID type appears in a JSON response as a String; however, it is not intended to be human-readable. When expected as an input type, any string (such as `"4"`) or integer (such as `4`) input value will be accepted as an ID. (required)
@@ -3174,7 +3175,7 @@ def create_group_profile(
     """CreateGroupProfile
 
 
-    Arguments:
+    Args:
         group: The `ID` scalar type represents a unique identifier, often used to refetch an object or as key for a cache. The ID type appears in a JSON response as a String; however, it is not intended to be human-readable. When expected as an input type, any string (such as `"4"`) or integer (such as `4`) input value will be accepted as an ID. (required)
         name: The `String` scalar type represents textual data, represented as UTF-8 character sequences. The String type is most often used by GraphQL to represent free-form human-readable text. (required)
         avatar: The `ID` scalar type represents a unique identifier, often used to refetch an object or as key for a cache. The ID type appears in a JSON response as a String; however, it is not intended to be human-readable. When expected as an input type, any string (such as `"4"`) or integer (such as `4`) input value will be accepted as an ID. (required)
@@ -3196,7 +3197,7 @@ async def aupdate_group_profile(
     """UpdateGroupProfile
 
 
-    Arguments:
+    Args:
         id: The `ID` scalar type represents a unique identifier, often used to refetch an object or as key for a cache. The ID type appears in a JSON response as a String; however, it is not intended to be human-readable. When expected as an input type, any string (such as `"4"`) or integer (such as `4`) input value will be accepted as an ID. (required)
         name: The `String` scalar type represents textual data, represented as UTF-8 character sequences. The String type is most often used by GraphQL to represent free-form human-readable text. (required)
         avatar: The `ID` scalar type represents a unique identifier, often used to refetch an object or as key for a cache. The ID type appears in a JSON response as a String; however, it is not intended to be human-readable. When expected as an input type, any string (such as `"4"`) or integer (such as `4`) input value will be accepted as an ID. (required)
@@ -3220,7 +3221,7 @@ def update_group_profile(
     """UpdateGroupProfile
 
 
-    Arguments:
+    Args:
         id: The `ID` scalar type represents a unique identifier, often used to refetch an object or as key for a cache. The ID type appears in a JSON response as a String; however, it is not intended to be human-readable. When expected as an input type, any string (such as `"4"`) or integer (such as `4`) input value will be accepted as an ID. (required)
         name: The `String` scalar type represents textual data, represented as UTF-8 character sequences. The String type is most often used by GraphQL to represent free-form human-readable text. (required)
         avatar: The `ID` scalar type represents a unique identifier, often used to refetch an object or as key for a cache. The ID type appears in a JSON response as a String; however, it is not intended to be human-readable. When expected as an input type, any string (such as `"4"`) or integer (such as `4`) input value will be accepted as an ID. (required)
@@ -3242,7 +3243,7 @@ async def acreate_user_profile(
     """CreateUserProfile
 
 
-    Arguments:
+    Args:
         user: The `ID` scalar type represents a unique identifier, often used to refetch an object or as key for a cache. The ID type appears in a JSON response as a String; however, it is not intended to be human-readable. When expected as an input type, any string (such as `"4"`) or integer (such as `4`) input value will be accepted as an ID. (required)
         name: The `String` scalar type represents textual data, represented as UTF-8 character sequences. The String type is most often used by GraphQL to represent free-form human-readable text. (required)
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
@@ -3265,7 +3266,7 @@ def create_user_profile(
     """CreateUserProfile
 
 
-    Arguments:
+    Args:
         user: The `ID` scalar type represents a unique identifier, often used to refetch an object or as key for a cache. The ID type appears in a JSON response as a String; however, it is not intended to be human-readable. When expected as an input type, any string (such as `"4"`) or integer (such as `4`) input value will be accepted as an ID. (required)
         name: The `String` scalar type represents textual data, represented as UTF-8 character sequences. The String type is most often used by GraphQL to represent free-form human-readable text. (required)
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
@@ -3284,7 +3285,7 @@ async def aupdate_user_profile(
     """UpdateUserProfile
 
 
-    Arguments:
+    Args:
         id: The `ID` scalar type represents a unique identifier, often used to refetch an object or as key for a cache. The ID type appears in a JSON response as a String; however, it is not intended to be human-readable. When expected as an input type, any string (such as `"4"`) or integer (such as `4`) input value will be accepted as an ID. (required)
         name: The `String` scalar type represents textual data, represented as UTF-8 character sequences. The String type is most often used by GraphQL to represent free-form human-readable text. (required)
         avatar: The `ID` scalar type represents a unique identifier, often used to refetch an object or as key for a cache. The ID type appears in a JSON response as a String; however, it is not intended to be human-readable. When expected as an input type, any string (such as `"4"`) or integer (such as `4`) input value will be accepted as an ID. (required)
@@ -3308,7 +3309,7 @@ def update_user_profile(
     """UpdateUserProfile
 
 
-    Arguments:
+    Args:
         id: The `ID` scalar type represents a unique identifier, often used to refetch an object or as key for a cache. The ID type appears in a JSON response as a String; however, it is not intended to be human-readable. When expected as an input type, any string (such as `"4"`) or integer (such as `4`) input value will be accepted as an ID. (required)
         name: The `String` scalar type represents textual data, represented as UTF-8 character sequences. The String type is most often used by GraphQL to represent free-form human-readable text. (required)
         avatar: The `ID` scalar type represents a unique identifier, often used to refetch an object or as key for a cache. The ID type appears in a JSON response as a String; however, it is not intended to be human-readable. When expected as an input type, any string (such as `"4"`) or integer (such as `4`) input value will be accepted as an ID. (required)
@@ -3333,7 +3334,7 @@ async def acreate_stash(
 
     Create a new stash
 
-    Arguments:
+    Args:
         name (Optional[str], optional): No description.
         description (Optional[str], optional): No description. Defaults to
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
@@ -3357,7 +3358,7 @@ def create_stash(
 
     Create a new stash
 
-    Arguments:
+    Args:
         name (Optional[str], optional): No description.
         description (Optional[str], optional): No description. Defaults to
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
@@ -3377,7 +3378,7 @@ async def aadd_items_to_stash(
 
     Add items to a stash
 
-    Arguments:
+    Args:
         stash (ID): No description
         items (List[StashItemInput]): No description
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
@@ -3399,7 +3400,7 @@ def add_items_to_stash(
 
     Add items to a stash
 
-    Arguments:
+    Args:
         stash (ID): No description
         items (List[StashItemInput]): No description
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
@@ -3419,7 +3420,7 @@ async def adelete_stash_items(
 
     Delete items from a stash
 
-    Arguments:
+    Args:
         items (List[ID]): No description
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
@@ -3438,7 +3439,7 @@ def delete_stash_items(
 
     Delete items from a stash
 
-    Arguments:
+    Args:
         items (List[ID]): No description
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
@@ -3454,7 +3455,7 @@ async def adelete_stash(stash: ID, rath: Optional[UnlokRath] = None) -> ID:
     """DeleteStash
 
 
-    Arguments:
+    Args:
         stash (ID): No description
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
@@ -3470,7 +3471,7 @@ def delete_stash(stash: ID, rath: Optional[UnlokRath] = None) -> ID:
     """DeleteStash
 
 
-    Arguments:
+    Args:
         stash (ID): No description
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
@@ -3488,7 +3489,7 @@ async def alist_service_instances(
     """ListServiceInstances
 
 
-    Arguments:
+    Args:
         pagination (Optional[OffsetPaginationInput], optional): No description.
         filters (Optional[ServiceInstanceFilter], optional): No description.
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
@@ -3513,7 +3514,7 @@ def list_service_instances(
     """ListServiceInstances
 
 
-    Arguments:
+    Args:
         pagination (Optional[OffsetPaginationInput], optional): No description.
         filters (Optional[ServiceInstanceFilter], optional): No description.
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
@@ -3534,7 +3535,7 @@ async def aget_service_instance(
     """GetServiceInstance
 
 
-    Arguments:
+    Args:
         id (ID): No description
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
@@ -3550,7 +3551,7 @@ def get_service_instance(id: ID, rath: Optional[UnlokRath] = None) -> ServiceIns
     """GetServiceInstance
 
 
-    Arguments:
+    Args:
         id (ID): No description
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
@@ -3568,7 +3569,7 @@ async def alist_services(
     """ListServices
 
 
-    Arguments:
+    Args:
         pagination (Optional[OffsetPaginationInput], optional): No description.
         filters (Optional[ServiceFilter], optional): No description.
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
@@ -3591,7 +3592,7 @@ def list_services(
     """ListServices
 
 
-    Arguments:
+    Args:
         pagination (Optional[OffsetPaginationInput], optional): No description.
         filters (Optional[ServiceFilter], optional): No description.
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
@@ -3608,7 +3609,7 @@ async def aget_service(id: ID, rath: Optional[UnlokRath] = None) -> Service:
     """GetService
 
 
-    Arguments:
+    Args:
         id (ID): No description
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
@@ -3622,7 +3623,7 @@ def get_service(id: ID, rath: Optional[UnlokRath] = None) -> Service:
     """GetService
 
 
-    Arguments:
+    Args:
         id (ID): No description
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
@@ -3636,7 +3637,7 @@ async def areleases(rath: Optional[UnlokRath] = None) -> Tuple[ListRelease, ...]
     """Releases
 
 
-    Arguments:
+    Args:
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
@@ -3649,7 +3650,7 @@ def releases(rath: Optional[UnlokRath] = None) -> Tuple[ListRelease, ...]:
     """Releases
 
 
-    Arguments:
+    Args:
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
@@ -3668,7 +3669,7 @@ async def arelease(
     """Release
 
 
-    Arguments:
+    Args:
         identifier (Optional[str], optional): No description.
         version (Optional[str], optional): No description.
         id (Optional[ID], optional): No description.
@@ -3702,7 +3703,7 @@ def release(
     """Release
 
 
-    Arguments:
+    Args:
         identifier (Optional[str], optional): No description.
         version (Optional[str], optional): No description.
         id (Optional[ID], optional): No description.
@@ -3723,7 +3724,7 @@ async def adetail_release(id: ID, rath: Optional[UnlokRath] = None) -> DetailRel
     """DetailRelease
 
 
-    Arguments:
+    Args:
         id (ID): No description
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
@@ -3737,7 +3738,7 @@ def detail_release(id: ID, rath: Optional[UnlokRath] = None) -> DetailRelease:
     """DetailRelease
 
 
-    Arguments:
+    Args:
         id (ID): No description
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
@@ -3755,7 +3756,7 @@ async def alayers(
     """Layers
 
 
-    Arguments:
+    Args:
         filters (Optional[LayerFilter], optional): No description.
         pagination (Optional[OffsetPaginationInput], optional): No description.
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
@@ -3778,7 +3779,7 @@ def layers(
     """Layers
 
 
-    Arguments:
+    Args:
         filters (Optional[LayerFilter], optional): No description.
         pagination (Optional[OffsetPaginationInput], optional): No description.
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
@@ -3795,7 +3796,7 @@ async def adetail_layer(id: ID, rath: Optional[UnlokRath] = None) -> Layer:
     """DetailLayer
 
 
-    Arguments:
+    Args:
         id (ID): No description
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
@@ -3809,7 +3810,7 @@ def detail_layer(id: ID, rath: Optional[UnlokRath] = None) -> Layer:
     """DetailLayer
 
 
-    Arguments:
+    Args:
         id (ID): No description
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
@@ -3829,7 +3830,7 @@ async def aglobal_search(
     """GlobalSearch
 
 
-    Arguments:
+    Args:
         no_users (bool): No description
         no_groups (bool): No description
         search (Optional[str], optional): No description.
@@ -3861,7 +3862,7 @@ def global_search(
     """GlobalSearch
 
 
-    Arguments:
+    Args:
         no_users (bool): No description
         no_groups (bool): No description
         search (Optional[str], optional): No description.
@@ -3891,7 +3892,7 @@ async def aapps(
     """Apps
 
 
-    Arguments:
+    Args:
         filters (Optional[AppFilter], optional): No description.
         pagination (Optional[OffsetPaginationInput], optional): No description.
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
@@ -3914,7 +3915,7 @@ def apps(
     """Apps
 
 
-    Arguments:
+    Args:
         filters (Optional[AppFilter], optional): No description.
         pagination (Optional[OffsetPaginationInput], optional): No description.
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
@@ -3936,7 +3937,7 @@ async def aapp(
     """App
 
 
-    Arguments:
+    Args:
         identifier (Optional[str], optional): No description.
         id (Optional[ID], optional): No description.
         client_id (Optional[ID], optional): No description.
@@ -3963,7 +3964,7 @@ def app(
     """App
 
 
-    Arguments:
+    Args:
         identifier (Optional[str], optional): No description.
         id (Optional[ID], optional): No description.
         client_id (Optional[ID], optional): No description.
@@ -3981,7 +3982,7 @@ async def adetail_app(id: ID, rath: Optional[UnlokRath] = None) -> DetailApp:
     """DetailApp
 
 
-    Arguments:
+    Args:
         id (ID): No description
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
@@ -3995,7 +3996,7 @@ def detail_app(id: ID, rath: Optional[UnlokRath] = None) -> DetailApp:
     """DetailApp
 
 
-    Arguments:
+    Args:
         id (ID): No description
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
@@ -4013,7 +4014,7 @@ async def aclients(
     """Clients
 
 
-    Arguments:
+    Args:
         filters (Optional[ClientFilter], optional): No description.
         pagination (Optional[OffsetPaginationInput], optional): No description.
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
@@ -4036,7 +4037,7 @@ def clients(
     """Clients
 
 
-    Arguments:
+    Args:
         filters (Optional[ClientFilter], optional): No description.
         pagination (Optional[OffsetPaginationInput], optional): No description.
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
@@ -4053,7 +4054,7 @@ async def adetail_client(id: ID, rath: Optional[UnlokRath] = None) -> DetailClie
     """DetailClient
 
 
-    Arguments:
+    Args:
         id (ID): No description
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
@@ -4067,7 +4068,7 @@ def detail_client(id: ID, rath: Optional[UnlokRath] = None) -> DetailClient:
     """DetailClient
 
 
-    Arguments:
+    Args:
         id (ID): No description
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
@@ -4083,7 +4084,7 @@ async def amy_managed_clients(
     """MyManagedClients
 
 
-    Arguments:
+    Args:
         kind (ClientKind): No description
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
@@ -4101,7 +4102,7 @@ def my_managed_clients(
     """MyManagedClients
 
 
-    Arguments:
+    Args:
         kind (ClientKind): No description
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
@@ -4115,7 +4116,7 @@ async def aclient(client_id: ID, rath: Optional[UnlokRath] = None) -> DetailClie
     """Client
 
 
-    Arguments:
+    Args:
         client_id (ID): No description
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
@@ -4129,7 +4130,7 @@ def client(client_id: ID, rath: Optional[UnlokRath] = None) -> DetailClient:
     """Client
 
 
-    Arguments:
+    Args:
         client_id (ID): No description
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
@@ -4143,7 +4144,7 @@ async def ascopes(rath: Optional[UnlokRath] = None) -> Tuple[ScopesQueryScopes, 
     """Scopes
 
 
-    Arguments:
+    Args:
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
@@ -4156,7 +4157,7 @@ def scopes(rath: Optional[UnlokRath] = None) -> Tuple[ScopesQueryScopes, ...]:
     """Scopes
 
 
-    Arguments:
+    Args:
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
@@ -4171,7 +4172,7 @@ async def ascopes_options(
     """ScopesOptions
 
 
-    Arguments:
+    Args:
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
@@ -4186,7 +4187,7 @@ def scopes_options(
     """ScopesOptions
 
 
-    Arguments:
+    Args:
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
@@ -4203,7 +4204,7 @@ async def aredeem_tokens(
     """RedeemTokens
 
 
-    Arguments:
+    Args:
         filters (Optional[RedeemTokenFilter], optional): No description.
         pagination (Optional[OffsetPaginationInput], optional): No description.
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
@@ -4226,7 +4227,7 @@ def redeem_tokens(
     """RedeemTokens
 
 
-    Arguments:
+    Args:
         filters (Optional[RedeemTokenFilter], optional): No description.
         pagination (Optional[OffsetPaginationInput], optional): No description.
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
@@ -4247,7 +4248,7 @@ async def agroup_options(
     """GroupOptions
 
 
-    Arguments:
+    Args:
         search (Optional[str], optional): No description.
         values (Optional[List[ID]], optional): No description.
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
@@ -4270,7 +4271,7 @@ def group_options(
     """GroupOptions
 
 
-    Arguments:
+    Args:
         search (Optional[str], optional): No description.
         values (Optional[List[ID]], optional): No description.
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
@@ -4287,7 +4288,7 @@ async def adetail_group(id: ID, rath: Optional[UnlokRath] = None) -> DetailGroup
     """DetailGroup
 
 
-    Arguments:
+    Args:
         id (ID): No description
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
@@ -4301,7 +4302,7 @@ def detail_group(id: ID, rath: Optional[UnlokRath] = None) -> DetailGroup:
     """DetailGroup
 
 
-    Arguments:
+    Args:
         id (ID): No description
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
@@ -4319,7 +4320,7 @@ async def agroups(
     """Groups
 
 
-    Arguments:
+    Args:
         filters (Optional[GroupFilter], optional): No description.
         pagination (Optional[OffsetPaginationInput], optional): No description.
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
@@ -4342,7 +4343,7 @@ def groups(
     """Groups
 
 
-    Arguments:
+    Args:
         filters (Optional[GroupFilter], optional): No description.
         pagination (Optional[OffsetPaginationInput], optional): No description.
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
@@ -4361,7 +4362,7 @@ async def amy_stashes(
     """MyStashes
 
 
-    Arguments:
+    Args:
         pagination (Optional[OffsetPaginationInput], optional): No description.
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
@@ -4379,7 +4380,7 @@ def my_stashes(
     """MyStashes
 
 
-    Arguments:
+    Args:
         pagination (Optional[OffsetPaginationInput], optional): No description.
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
@@ -4393,7 +4394,7 @@ async def ame(rath: Optional[UnlokRath] = None) -> DetailUser:
     """Me
 
 
-    Arguments:
+    Args:
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
@@ -4406,7 +4407,7 @@ def me(rath: Optional[UnlokRath] = None) -> DetailUser:
     """Me
 
 
-    Arguments:
+    Args:
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
@@ -4419,7 +4420,7 @@ async def auser(id: ID, rath: Optional[UnlokRath] = None) -> DetailUser:
     """User
 
 
-    Arguments:
+    Args:
         id (ID): No description
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
@@ -4433,7 +4434,7 @@ def user(id: ID, rath: Optional[UnlokRath] = None) -> DetailUser:
     """User
 
 
-    Arguments:
+    Args:
         id (ID): No description
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
@@ -4447,7 +4448,7 @@ async def adetail_user(id: ID, rath: Optional[UnlokRath] = None) -> DetailUser:
     """DetailUser
 
 
-    Arguments:
+    Args:
         id (ID): No description
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
@@ -4461,7 +4462,7 @@ def detail_user(id: ID, rath: Optional[UnlokRath] = None) -> DetailUser:
     """DetailUser
 
 
-    Arguments:
+    Args:
         id (ID): No description
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
@@ -4479,7 +4480,7 @@ async def ausers(
     """Users
 
 
-    Arguments:
+    Args:
         filters (Optional[UserFilter], optional): No description.
         pagination (Optional[OffsetPaginationInput], optional): No description.
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
@@ -4502,7 +4503,7 @@ def users(
     """Users
 
 
-    Arguments:
+    Args:
         filters (Optional[UserFilter], optional): No description.
         pagination (Optional[OffsetPaginationInput], optional): No description.
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
@@ -4523,7 +4524,7 @@ async def auser_options(
     """UserOptions
 
 
-    Arguments:
+    Args:
         search (Optional[str], optional): No description.
         values (Optional[List[ID]], optional): No description.
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
@@ -4546,7 +4547,7 @@ def user_options(
     """UserOptions
 
 
-    Arguments:
+    Args:
         search (Optional[str], optional): No description.
         values (Optional[List[ID]], optional): No description.
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
@@ -4563,7 +4564,7 @@ async def aprofile(rath: Optional[UnlokRath] = None) -> MeUser:
     """Profile
 
 
-    Arguments:
+    Args:
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
@@ -4576,7 +4577,7 @@ def profile(rath: Optional[UnlokRath] = None) -> MeUser:
     """Profile
 
 
-    Arguments:
+    Args:
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
@@ -4591,7 +4592,7 @@ async def acomments_for(
     """CommentsFor
 
 
-    Arguments:
+    Args:
         object (ID): No description
         identifier (str): No description
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
@@ -4612,7 +4613,7 @@ def comments_for(
     """CommentsFor
 
 
-    Arguments:
+    Args:
         object (ID): No description
         identifier (str): No description
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
@@ -4629,7 +4630,7 @@ async def amy_mentions(rath: Optional[UnlokRath] = None) -> Tuple[MentionComment
     """MyMentions
 
 
-    Arguments:
+    Args:
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
@@ -4642,7 +4643,7 @@ def my_mentions(rath: Optional[UnlokRath] = None) -> Tuple[MentionComment, ...]:
     """MyMentions
 
 
-    Arguments:
+    Args:
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
@@ -4655,7 +4656,7 @@ async def adetail_comment(id: ID, rath: Optional[UnlokRath] = None) -> DetailCom
     """DetailComment
 
 
-    Arguments:
+    Args:
         id (ID): No description
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
@@ -4669,7 +4670,7 @@ def detail_comment(id: ID, rath: Optional[UnlokRath] = None) -> DetailComment:
     """DetailComment
 
 
-    Arguments:
+    Args:
         id (ID): No description
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
@@ -4685,7 +4686,7 @@ async def awatch_mentions(
     """WatchMentions
 
 
-    Arguments:
+    Args:
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
@@ -4699,7 +4700,7 @@ def watch_mentions(rath: Optional[UnlokRath] = None) -> Iterator[MentionComment]
     """WatchMentions
 
 
-    Arguments:
+    Args:
         rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
@@ -4717,5 +4718,4 @@ LayerFilter.model_rebuild()
 RedeemTokenFilter.model_rebuild()
 ServiceFilter.model_rebuild()
 ServiceInstanceFilter.model_rebuild()
-UserDefinedServiceInstanceInput.model_rebuild()
 UserFilter.model_rebuild()
