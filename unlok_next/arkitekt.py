@@ -1,13 +1,11 @@
 import json
-from arkitekt_next.base_models import Manifest
+from fakts_next.contrib.rath.auth import FaktsAuthLink
 from unlok_next.unlok import Unlok
 from unlok_next.rath import UnlokLinkComposition, UnlokRath
 from rath.links.split import SplitLink
 from fakts_next.contrib.rath.aiohttp import FaktsAIOHttpLink
 from fakts_next.contrib.rath.graphql_ws import FaktsGraphQLWSLink
-from herre_next.contrib.rath.auth_link import HerreAuthLink
 from graphql import OperationType
-from herre_next import Herre
 from fakts_next import Fakts
 
 from arkitekt_next.service_registry import (
@@ -15,7 +13,7 @@ from arkitekt_next.service_registry import (
     Params,
     get_default_service_registry,
 )
-from arkitekt_next.base_models import Requirement
+from fakts_next.models import Requirement
 import os
 
 
@@ -27,13 +25,11 @@ class UnlokService(BaseArkitektService):
     def get_service_name(self):
         return "unlok"
 
-    def build_service(
-        self, fakts: Fakts, herre: Herre, params: Params, manifest: Manifest
-    ):
+    def build_service(self, fakts: Fakts, params: Params):
         return Unlok(
             rath=UnlokRath(
                 link=UnlokLinkComposition(
-                    auth=HerreAuthLink(herre=herre),
+                    auth=FaktsAuthLink(fakts=fakts),
                     split=SplitLink(
                         left=FaktsAIOHttpLink(
                             fakts_group="lok", fakts=fakts, endpoint_url="FAKE_URL"
