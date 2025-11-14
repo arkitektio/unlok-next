@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.2.0 (2025-11-14)
+
+### Features
+
+- Fix client and public sources
+  ([`8e53f1e`](https://github.com/arkitektio/unlok-next/commit/8e53f1e2809c695adae4c99bd7a9d56faa59f213))
+
+
 ## v1.1.1 (2025-06-27)
 
 ### Bug Fixes
