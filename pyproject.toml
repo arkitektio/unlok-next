@@ -7,7 +7,7 @@ requires-python = ">=3.11"
 readme = "README.md"
 dependencies = [
     "dokker>=2",
-    "rath>=3.4",
+    "rath>=3.7",
     "websockets>=15.0.1",
 ]
 

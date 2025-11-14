@@ -4,7 +4,7 @@ from .conftest import DeployedUnlok
 
 
 @pytest.mark.integration
-@pytest.mark.skip
+@pytest.mark.skip(reason="Integration test - only run when deploying")
 def test_list_user(deployed_app: DeployedUnlok) -> None:
     x = list_services()
     assert len(x) > 0, "Was not able to find any definitions"

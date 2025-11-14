@@ -47,9 +47,15 @@ type User {
   The groups this user belongs to. A user will get all permissions granted to each of their groups.
   """
   groups(filters: GroupFilter, pagination: OffsetPaginationInput): [Group!]!
+
+  """The memberships of the user in organizations"""
+  memberships(filters: MembershipFilter, pagination: OffsetPaginationInput): [Membership!]!
   avatar: String
   profile: Profile!
   managedClients: [DjangoModelType!]!
+
+  """The communication channels that the user has"""
+  comChannels(filters: OrganizationFilter, pagination: OffsetPaginationInput): [ComChannel!]!
 }
 
 "\nA Group is the base unit of Role Based Access Control. A Group can have many users and many permissions. A user can have many groups. A user with a group that has a permission can perform the action that the permission allows.\nGroups are propagated to the respecting subservices. Permissions are not. Each subservice has to define its own permissions and mappings to groups.\n"
@@ -76,7 +82,12 @@ type GroupProfile {
   avatar: MediaStore
 }
 
-"""MediaStore(id, path, key, bucket, populated, s3store_ptr)"""
+"""
+Small helper around S3-backed stored objects.
+
+Provides convenience helpers for generating presigned URLs and
+uploading content.
+"""
 type MediaStore {
   id: ID!
 
@@ -123,6 +134,95 @@ input OffsetPaginationInput {
   limit: Int
 }
 
+"\nA Membership is a relation between a User and an Organization. It can have multiple Roles assigned to it.\n"
+type Membership {
+  id: ID!
+  user: User!
+  organization: Organization!
+
+  """The roles that the user has in the organization"""
+  roles(filters: RoleFilter, pagination: OffsetPaginationInput): [Role!]!
+
+  """The groups that the user has in the organization"""
+  groups: [Group!]!
+}
+
+"""
+An Organization is a group of users that can work together on a project.
+"""
+type Organization {
+  id: ID!
+  slug: String!
+
+  """A short description of the organization"""
+  description: String
+
+  """The logo of the organization"""
+  logo: MediaStore
+
+  """The users that are part of the organization"""
+  users(filters: UserFilter, pagination: OffsetPaginationInput): [User!]!
+
+  """The users that are currently active in the organization"""
+  activeUsers(filters: UserFilter, pagination: OffsetPaginationInput): [User!]!
+
+  """The roles that are available in the organization"""
+  roles: [Role!]!
+
+  """The name of this organization"""
+  name: String!
+}
+
+"""
+A User of the System
+
+Lok Users are the main users of the system. They can be assigned to groups and have profiles, that can be used to display information about them.
+Each user is identifier by a unique username, and can have an email address associated with them.
+"""
+input UserFilter {
+  search: String
+
+  """Required. 150 characters or fewer. Letters, digits and @/./+/-/_ only."""
+  username: StrFilterLookup
+  ids: [ID!]
+  AND: UserFilter
+  OR: UserFilter
+  NOT: UserFilter
+  DISTINCT: Boolean
+}
+
+"""
+A Role is a set of permissions that can be assigned to a user. It is used to define what a user can do in the system.
+"""
+type Role {
+  id: ID!
+  identifier: String!
+  organization: Organization!
+  description: String!
+}
+
+"""__doc__"""
+input RoleFilter {
+  search: String
+  name: StrFilterLookup
+  ids: [ID!]
+  AND: RoleFilter
+  OR: RoleFilter
+  NOT: RoleFilter
+  DISTINCT: Boolean
+}
+
+"""__doc__"""
+input MembershipFilter {
+  search: String
+  name: StrFilterLookup
+  ids: [ID!]
+  AND: MembershipFilter
+  OR: MembershipFilter
+  NOT: MembershipFilter
+  DISTINCT: Boolean
+}
+
 "\nA Profile of a User. A Profile can be used to display personalied information about a user.\n\n"
 type Profile {
   id: ID!
@@ -139,6 +239,25 @@ type Profile {
 
 type DjangoModelType {
   pk: ID!
+}
+
+"""
+An Organization is a group of users that can work together on a project.
+"""
+type ComChannel {
+  id: ID!
+  user: User!
+}
+
+"""__doc__"""
+input OrganizationFilter {
+  search: String
+  name: StrFilterLookup
+  ids: [ID!]
+  AND: OrganizationFilter
+  OR: OrganizationFilter
+  NOT: OrganizationFilter
+  DISTINCT: Boolean
 }
 
 """A Paragraph of text"""
@@ -166,16 +285,22 @@ type LeafDescendant implements Descendant {
   italic: Boolean
   underline: Boolean
   text: String
-  code: String
+  code: Boolean
 }
 
+scalar _Any
+
 type Query {
+  _service: _Service!
   stashes(filters: StashFilter, pagination: OffsetPaginationInput): [Stash!]!
   stashItems(filters: StashItemFilter, pagination: OffsetPaginationInput): [StashItem!]!
+  organizations(filters: OrganizationFilter, pagination: OffsetPaginationInput): [Organization!]!
+  computeNodes(filters: ComputeNodeFilter, pagination: OffsetPaginationInput): [ComputeNode!]!
   apps(filters: AppFilter, pagination: OffsetPaginationInput): [App!]!
   releases: [Release!]!
   clients(filters: ClientFilter, pagination: OffsetPaginationInput): [Client!]!
   users(filters: UserFilter, pagination: OffsetPaginationInput): [User!]!
+  roles(filters: RoleFilter, pagination: OffsetPaginationInput): [Role!]!
   groups(filters: GroupFilter, pagination: OffsetPaginationInput): [Group!]!
   comments: [Comment!]!
   services(filters: ServiceFilter, pagination: OffsetPaginationInput): [Service!]!
@@ -184,7 +309,9 @@ type Query {
   redeemTokens(filters: RedeemTokenFilter, pagination: OffsetPaginationInput): [RedeemToken!]!
   stash(id: ID!): Stash!
   stashItem(id: ID!): StashItem!
+  userStats(filters: UserFilter = null): UserStats!
   myStashes: [Stash!]!
+  mycontext: Context!
   user(id: ID!): User!
   me: User!
   group(id: ID!): Group!
@@ -201,8 +328,17 @@ type Query {
   message(id: ID!): SystemMessage!
   hallo: String!
   service(id: ID!): Service!
+  computeNode(id: ID!): ComputeNode!
+  role(id: ID!): Role!
+  organization(id: ID!): Organization!
+  redeemToken(id: ID!): RedeemToken!
+  myRedeemTokens: [RedeemToken!]!
   layer(id: ID!): Layer!
   serviceInstance(id: ID!): ServiceInstance!
+}
+
+type _Service {
+  sdl: String!
 }
 
 "\nA Stash\n"
@@ -256,76 +392,13 @@ input StashFilter {
   DISTINCT: Boolean
 }
 
-"""
-An App is the Arkitekt equivalent of a Software Application. It is a collection of `Releases` that can be all part of the same application. E.g the App `Napari` could have the releases `0.1.0` and `0.2.0`.
-"""
-type App {
+"""ComputeNode(id, node_id, name, organization)"""
+type ComputeNode {
   id: ID!
-
-  """The name of the app"""
-  name: String!
-
-  """
-  The identifier of the app. This should be a globally unique string that identifies the app. We encourage you to use the reverse domain name notation. E.g. `com.example.myapp`
-  """
-  identifier: AppIdentifier!
-
-  """
-  The releases of the app. A release is a version of the app that can be installed by a user.
-  """
-  releases: [Release!]!
-
-  """
-  The logo of the app. This should be a url to a logo that can be used to represent the app.
-  """
-  logo: MediaStore
-}
-
-"""
-The App identifier is a unique identifier for an app. It is used to identify the app in the database and in the code. We encourage you to use the reverse domain name notation. E.g. `com.example.myapp`
-"""
-scalar AppIdentifier
-
-"""
-A Release is a version of an app. Releases might change over time. E.g. a release might be updated to fix a bug, and the release might be updated to add a new feature. This is why they are the home for `scopes` and `requirements`, which might change over the release cycle.
-"""
-type Release {
-  id: ID!
-
-  """The app that this release belongs to."""
-  app: App!
-
-  """
-  The version of the release. This should be a string that identifies the version of the release. We enforce semantic versioning notation. E.g. `0.1.0`. The version is unique per app.
-  """
-  version: Version!
-
-  """
-  The name of the release. This should be a string that identifies the release beyond the version number. E.g. `canary`.
-  """
-  name: String!
-
-  """
-  The logo of the release. This should be a url to a logo that can be used to represent the release.
-  """
-  logo: MediaStore
-
-  """
-  The scopes of the release. Scopes are used to limit the access of a client to a user's data. They represent app-level permissions.
-  """
-  scopes: [String!]!
-
-  """
-  The requirements of the release. Requirements are used to limit the access of a client to a user's data. They represent app-level permissions.
-  """
-  requirements: [String!]!
-
-  """The clients of the release"""
+  name: String
+  nodeId: ID!
   clients(filters: ClientFilter, pagination: OffsetPaginationInput): [Client!]!
 }
-
-"""The `Version` represents a semver version string"""
-scalar Version
 
 """
 A client is a way of authenticating users with a release.
@@ -368,6 +441,9 @@ type Client {
   """The name of the client. This is a human readable name of the client."""
   name: String!
 
+  """The node this runs on"""
+  node: ComputeNode
+
   """
   The mappings of the client. A mapping is a mapping of a service to a service instance. This is used to configure the composition.
   """
@@ -379,6 +455,89 @@ type Client {
   token: String!
 }
 
+"""
+A Release is a version of an app. Releases might change over time. E.g. a release might be updated to fix a bug, and the release might be updated to add a new feature. This is why they are the home for `scopes` and `requirements`, which might change over the release cycle.
+"""
+type Release {
+  id: ID!
+
+  """The app that this release belongs to."""
+  app: App!
+
+  """
+  The version of the release. This should be a string that identifies the version of the release. We enforce semantic versioning notation. E.g. `0.1.0`. The version is unique per app.
+  """
+  version: Version!
+
+  """
+  The name of the release. This should be a string that identifies the release beyond the version number. E.g. `canary`.
+  """
+  name: String!
+
+  """
+  The logo of the release. This should be a url to a logo that can be used to represent the release.
+  """
+  logo: MediaStore
+
+  """
+  The scopes of the release. Scopes are used to limit the access of a client to a user's data. They represent app-level permissions.
+  """
+  scopes: [String!]!
+
+  """
+  The requirements of the release. Requirements are used to limit the access of a client to a user's data. They represent app-level permissions.
+  """
+  requirements: [String!]!
+
+  """The clients of the release"""
+  clients(filters: ClientFilter, pagination: OffsetPaginationInput): [Client!]!
+}
+
+"""
+An App is the Arkitekt equivalent of a Software Application. It is a collection of `Releases` that can be all part of the same application. E.g the App `Napari` could have the releases `0.1.0` and `0.2.0`.
+"""
+type App {
+  id: ID!
+
+  """The name of the app"""
+  name: String!
+
+  """
+  The identifier of the app. This should be a globally unique string that identifies the app. We encourage you to use the reverse domain name notation. E.g. `com.example.myapp`
+  """
+  identifier: AppIdentifier!
+
+  """
+  The releases of the app. A release is a version of the app that can be installed by a user.
+  """
+  releases: [Release!]!
+
+  """
+  The logo of the app. This should be a url to a logo that can be used to represent the app.
+  """
+  logo: MediaStore
+}
+
+"""
+The App identifier is a unique identifier for an app. It is used to identify the app in the database and in the code. We encourage you to use the reverse domain name notation. E.g. `com.example.myapp`
+"""
+scalar AppIdentifier
+
+"""The `Version` represents a semver version string"""
+scalar Version
+
+"""
+Client(id, name, release, oauth2_client, kind, user, organization, redirect_uris, public, token, node, public_sources, tenant, created_at, requirements_hash, logo)
+"""
+input ClientFilter {
+  search: String
+  ids: [ID!]
+  AND: ClientFilter
+  OR: ClientFilter
+  NOT: ClientFilter
+  DISTINCT: Boolean
+}
+
 enum ClientKind {
   DEVELOPMENT
   WEBSITE
@@ -386,7 +545,7 @@ enum ClientKind {
 }
 
 """
-OAuth2Client(id, user, client_id, client_secret, redirect_uris, scope, token_endpoint_auth_method, grant_types, response_types)
+OAuth2Client(id, user, organization, client_id, client_secret, redirect_uris, scope, token_endpoint_auth_method, grant_types, response_types)
 """
 type Oauth2Client {
   id: String!
@@ -509,24 +668,6 @@ input ServiceInstanceFilter {
 }
 
 """
-A User of the System
-
-Lok Users are the main users of the system. They can be assigned to groups and have profiles, that can be used to display information about them.
-Each user is identifier by a unique username, and can have an email address associated with them.
-"""
-input UserFilter {
-  search: String
-
-  """Required. 150 characters or fewer. Letters, digits and @/./+/-/_ only."""
-  username: StrFilterLookup
-  ids: [ID!]
-  AND: UserFilter
-  OR: UserFilter
-  NOT: UserFilter
-  DISTINCT: Boolean
-}
-
-"""
 An alias for a service instance. This is used to provide a more user-friendly name for the instance.
 """
 type InstanceAlias {
@@ -597,15 +738,13 @@ type Layer {
   instances(filters: ServiceInstanceFilter, pagination: OffsetPaginationInput): [ServiceInstance!]!
 }
 
-"""
-Client(id, name, release, oauth2_client, kind, user, redirect_uris, public, token, tenant, created_at, requirements_hash, logo)
-"""
-input ClientFilter {
+"""ComputeNode(id, node_id, name, organization)"""
+input ComputeNodeFilter {
   search: String
   ids: [ID!]
-  AND: ClientFilter
-  OR: ClientFilter
-  NOT: ClientFilter
+  AND: ComputeNodeFilter
+  OR: ComputeNodeFilter
+  NOT: ComputeNodeFilter
   DISTINCT: Boolean
 }
 
@@ -729,6 +868,75 @@ input RedeemTokenFilter {
   DISTINCT: Boolean
 }
 
+type UserStats {
+  """Total number of items in the selection"""
+  count: Int!
+
+  """Number of distinct values for the field"""
+  distinctCount(field: UserField!): Int!
+
+  """Maximum"""
+  max(field: UserField!): Float
+
+  """Minimum"""
+  min(field: UserField!): Float
+
+  """Average"""
+  avg(field: UserField!): Float
+
+  """Sum"""
+  sum(field: UserField!): Float
+
+  """Time-bucketed stats over a datetime field."""
+  series(field: UserField!, timestampField: UserTimestampField!, by: Granularity!): [TimeBucket!]!
+}
+
+"""Numeric/aggregatable fields of User"""
+enum UserField {
+  CREATED_AT
+}
+
+type TimeBucket {
+  ts: DateTime!
+  count: Int!
+  distinctCount: Int!
+  max: Float
+  min: Float
+  avg: Float
+  sum: Float
+}
+
+"""Datetime fields of User for bucketing"""
+enum UserTimestampField {
+  CREATED_AT
+}
+
+enum Granularity {
+  HOUR
+  DAY
+  WEEK
+  MONTH
+  QUARTER
+  YEAR
+}
+
+type Context {
+  """The user that is associated with this app"""
+  user: User!
+
+  """The organization that is associated with this app"""
+  organization: Organization!
+
+  """The roles that the user has in the organization"""
+  roles: [String!]!
+
+  """The scope of the app within in the organization"""
+  scope: [String!]!
+
+  """Are we acting in the active organization of the user?"""
+  fitsActiveOrganization: Boolean!
+}
+
 """
 A scope that can be assigned to a client. Scopes are used to limit the access of a client to a user's data. They represent app-level permissions.
 """
@@ -760,7 +968,11 @@ type SystemMessage {
 
 type Mutation {
   createUser(input: CreateUserInput!): User!
+  addUserToOrganization(input: AddUserToOrganizationInput!): Membership!
   createComment(input: CreateCommentInput!): Comment!
+  registerComChannel(input: RegisterComChannelInput!): ComChannel!
+  notifyUser(input: NotifyUserInput!): Boolean!
+  createRedeemToken(input: RedeemTokenInput!): RedeemToken!
   replyTo(input: ReplyToCommentInput!): Comment!
   resolveComment(input: ResolveCommentInput!): Comment!
   createDevelopmentalClient(input: DevelopmentClientInput!): Client!
@@ -788,10 +1000,17 @@ type Mutation {
   createProfile(input: CreateProfileInput!): Profile!
   updateGroupProfile(input: UpdateGroupProfileInput!): GroupProfile!
   createGroupProfile(input: CreateGroupProfileInput!): GroupProfile!
+  updateComputeNode(input: UpdateComputeNodeInput!): ComputeNode!
 }
 
 input CreateUserInput {
   name: String!
+}
+
+input AddUserToOrganizationInput {
+  user: ID!
+  organization: ID!
+  roles: [String!]!
 }
 
 input CreateCommentInput {
@@ -804,12 +1023,26 @@ input CreateCommentInput {
 
 input DescendantInput {
   kind: DescendantKind!
-  children: [DescendantInput!]
-  user: String
-  bold: Boolean
-  italic: Boolean
-  code: Boolean
-  text: String
+  children: [DescendantInput!] = null
+  user: String = null
+  bold: Boolean = null
+  italic: Boolean = null
+  code: Boolean = null
+  text: String = null
+}
+
+input RegisterComChannelInput {
+  token: String!
+}
+
+input NotifyUserInput {
+  user: ID!
+  message: String!
+  title: String = ""
+}
+
+input RedeemTokenInput {
+  token: String = null
 }
 
 input ReplyToCommentInput {
@@ -826,7 +1059,6 @@ input ResolveCommentInput {
 input DevelopmentClientInput {
   manifest: ManifestInput!
   composition: ID = null
-  requirements: [Requirement!]! = []
   layers: [String!] = ["web"]
 }
 
@@ -835,6 +1067,9 @@ input ManifestInput {
   version: String!
   logo: String = null
   scopes: [String!]! = []
+  requirements: [Requirement!]! = []
+  nodeId: String = null
+  publicSources: [PublicSourceInput!] = null
 }
 
 input Requirement {
@@ -842,6 +1077,16 @@ input Requirement {
   optional: Boolean! = false
   description: String = null
   key: String!
+}
+
+input PublicSourceInput {
+  kind: PublicSourceKind!
+  url: String!
+}
+
+enum PublicSourceKind {
+  GITHUB
+  WEBSITE
 }
 
 """The `Fakt` scalar type represents a reference to a fakt"""
@@ -953,6 +1198,11 @@ input CreateGroupProfileInput {
   group: ID!
   name: String!
   avatar: ID!
+}
+
+input UpdateComputeNodeInput {
+  id: ID!
+  name: String
 }
 
 type Subscription {
