@@ -19,6 +19,7 @@ fragment DetailClient on Client {
   mappings {
     ...ListServiceInstanceMapping
   }
+  issueUrl
 }
 
 fragment ListClient on Client {
