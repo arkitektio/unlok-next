@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.3.0 (2025-11-14)
+
+### Features
+
+- Add public source api
+  ([`ea9b561`](https://github.com/arkitektio/unlok-next/commit/ea9b561e8eed2f6fa073f5c40fee00577299c6b8))
+
+
 ## v1.2.0 (2025-11-14)
 
 ### Features
