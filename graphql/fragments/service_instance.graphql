@@ -1,11 +1,12 @@
 fragment ServiceInstance on ServiceInstance {
   id
-  identifier
-  service {
-    identifier
-    id
-    description
-    name
+  instanceId
+  release {
+    version 
+    service {
+      id
+      identifier
+    }
   }
 
   allowedUsers {
@@ -30,7 +31,7 @@ fragment ServiceInstance on ServiceInstance {
 
 fragment ListServiceInstance on ServiceInstance {
   id
-  identifier
+  instanceId
   allowedUsers {
     ...ListUser
   }

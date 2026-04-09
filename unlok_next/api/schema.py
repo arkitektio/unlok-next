@@ -1,29 +1,21 @@
 from typing import (
-    Tuple,
-    Optional,
-    AsyncIterator,
     Iterable,
     Any,
     List,
-    Iterator,
-    Union,
-    Annotated,
+    Optional,
+    Tuple,
     Literal,
+    Annotated,
+    Union,
+    AsyncIterator,
+    Iterator,
 )
-from unlok_next.funcs import subscribe, asubscribe, aexecute, execute
-from rath.scalars import ID, IDCoercible
+from unlok_next.funcs import execute, subscribe, aexecute, asubscribe
+from rath.scalars import IDCoercible, ID
+from datetime import datetime
 from enum import Enum
 from unlok_next.rath import UnlokRath
-from pydantic import Field, BaseModel, ConfigDict
-from datetime import datetime
-
-
-class DescendantKind(str, Enum):
-    """The Kind of a Descendant"""
-
-    LEAF = "LEAF"
-    MENTION = "MENTION"
-    PARAGRAPH = "PARAGRAPH"
+from pydantic import ConfigDict, BaseModel, Field
 
 
 class ClientKind(str, Enum):
@@ -34,109 +26,19 @@ class ClientKind(str, Enum):
     DESKTOP = "DESKTOP"
 
 
+class DescendantKind(str, Enum):
+    """The Kind of a Descendant"""
+
+    LEAF = "LEAF"
+    MENTION = "MENTION"
+    PARAGRAPH = "PARAGRAPH"
+
+
 class PublicSourceKind(str, Enum):
     """No documentation"""
 
     GITHUB = "GITHUB"
     WEBSITE = "WEBSITE"
-
-
-class GroupFilter(BaseModel):
-    """__doc__"""
-
-    search: Optional[str] = None
-    name: Optional["StrFilterLookup"] = None
-    ids: Optional[Tuple[ID, ...]] = None
-    and_: Optional["GroupFilter"] = Field(alias="AND", default=None)
-    or_: Optional["GroupFilter"] = Field(alias="OR", default=None)
-    not_: Optional["GroupFilter"] = Field(alias="NOT", default=None)
-    distinct: Optional[bool] = Field(alias="DISTINCT", default=None)
-    model_config = ConfigDict(
-        frozen=True, extra="forbid", populate_by_name=True, use_enum_values=True
-    )
-
-
-class StrFilterLookup(BaseModel):
-    """No documentation"""
-
-    exact: Optional[str] = None
-    i_exact: Optional[str] = Field(alias="iExact", default=None)
-    contains: Optional[str] = None
-    i_contains: Optional[str] = Field(alias="iContains", default=None)
-    in_list: Optional[Tuple[str, ...]] = Field(alias="inList", default=None)
-    gt: Optional[str] = None
-    gte: Optional[str] = None
-    lt: Optional[str] = None
-    lte: Optional[str] = None
-    starts_with: Optional[str] = Field(alias="startsWith", default=None)
-    i_starts_with: Optional[str] = Field(alias="iStartsWith", default=None)
-    ends_with: Optional[str] = Field(alias="endsWith", default=None)
-    i_ends_with: Optional[str] = Field(alias="iEndsWith", default=None)
-    range: Optional[Tuple[str, ...]] = None
-    is_null: Optional[bool] = Field(alias="isNull", default=None)
-    regex: Optional[str] = None
-    i_regex: Optional[str] = Field(alias="iRegex", default=None)
-    model_config = ConfigDict(
-        frozen=True, extra="forbid", populate_by_name=True, use_enum_values=True
-    )
-
-
-class OffsetPaginationInput(BaseModel):
-    """No documentation"""
-
-    offset: int
-    limit: Optional[int] = None
-    model_config = ConfigDict(
-        frozen=True, extra="forbid", populate_by_name=True, use_enum_values=True
-    )
-
-
-class UserFilter(BaseModel):
-    """A User of the System
-
-    Lok Users are the main users of the system. They can be assigned to groups and have profiles, that can be used to display information about them.
-    Each user is identifier by a unique username, and can have an email address associated with them.
-    """
-
-    search: Optional[str] = None
-    username: Optional[StrFilterLookup] = None
-    "Required. 150 characters or fewer. Letters, digits and @/./+/-/_ only."
-    ids: Optional[Tuple[ID, ...]] = None
-    and_: Optional["UserFilter"] = Field(alias="AND", default=None)
-    or_: Optional["UserFilter"] = Field(alias="OR", default=None)
-    not_: Optional["UserFilter"] = Field(alias="NOT", default=None)
-    distinct: Optional[bool] = Field(alias="DISTINCT", default=None)
-    model_config = ConfigDict(
-        frozen=True, extra="forbid", populate_by_name=True, use_enum_values=True
-    )
-
-
-class ClientFilter(BaseModel):
-    """Client(id, name, release, oauth2_client, kind, user, organization, redirect_uris, public, token, node, public_sources, tenant, created_at, requirements_hash, logo)"""
-
-    search: Optional[str] = None
-    ids: Optional[Tuple[ID, ...]] = None
-    and_: Optional["ClientFilter"] = Field(alias="AND", default=None)
-    or_: Optional["ClientFilter"] = Field(alias="OR", default=None)
-    not_: Optional["ClientFilter"] = Field(alias="NOT", default=None)
-    distinct: Optional[bool] = Field(alias="DISTINCT", default=None)
-    model_config = ConfigDict(
-        frozen=True, extra="forbid", populate_by_name=True, use_enum_values=True
-    )
-
-
-class ServiceInstanceFilter(BaseModel):
-    """ServiceInstance(id, service, logo, identifier, steward, template)"""
-
-    search: Optional[str] = None
-    ids: Optional[Tuple[ID, ...]] = None
-    and_: Optional["ServiceInstanceFilter"] = Field(alias="AND", default=None)
-    or_: Optional["ServiceInstanceFilter"] = Field(alias="OR", default=None)
-    not_: Optional["ServiceInstanceFilter"] = Field(alias="NOT", default=None)
-    distinct: Optional[bool] = Field(alias="DISTINCT", default=None)
-    model_config = ConfigDict(
-        frozen=True, extra="forbid", populate_by_name=True, use_enum_values=True
-    )
 
 
 class AppFilter(BaseModel):
@@ -153,48 +55,52 @@ class AppFilter(BaseModel):
     )
 
 
-class ServiceFilter(BaseModel):
-    """Service(id, name, identifier, logo, description)"""
+class ClientFilter(BaseModel):
+    """Client(id, composition, functional, name, release, oauth2_client, kind, user, organization, membership, redirect_uris, public, token, node, public_sources, tenant, created_at, requirements_hash, logo, last_reported_at, manifest)"""
 
     search: Optional[str] = None
     ids: Optional[Tuple[ID, ...]] = None
-    and_: Optional["ServiceFilter"] = Field(alias="AND", default=None)
-    or_: Optional["ServiceFilter"] = Field(alias="OR", default=None)
-    not_: Optional["ServiceFilter"] = Field(alias="NOT", default=None)
+    and_: Optional["ClientFilter"] = Field(alias="AND", default=None)
+    or_: Optional["ClientFilter"] = Field(alias="OR", default=None)
+    not_: Optional["ClientFilter"] = Field(alias="NOT", default=None)
     distinct: Optional[bool] = Field(alias="DISTINCT", default=None)
     model_config = ConfigDict(
         frozen=True, extra="forbid", populate_by_name=True, use_enum_values=True
     )
 
 
-class LayerFilter(BaseModel):
-    """Layer(id, name, identifier, logo, description, dns_probe, get_probe, kind)"""
+class CreateGroupProfileInput(BaseModel):
+    """No documentation"""
 
-    search: Optional[str] = None
-    ids: Optional[Tuple[ID, ...]] = None
-    and_: Optional["LayerFilter"] = Field(alias="AND", default=None)
-    or_: Optional["LayerFilter"] = Field(alias="OR", default=None)
-    not_: Optional["LayerFilter"] = Field(alias="NOT", default=None)
-    distinct: Optional[bool] = Field(alias="DISTINCT", default=None)
+    group: ID
+    name: str
+    avatar: ID
     model_config = ConfigDict(
         frozen=True, extra="forbid", populate_by_name=True, use_enum_values=True
     )
 
 
-class RedeemTokenFilter(BaseModel):
-    """A redeem token is a token that can be used to redeem the rights to create
-    a client. It is used to give the recipient the right to create a client.
+class CreateProfileInput(BaseModel):
+    """No documentation"""
 
-    If the token is not redeemed within the expires_at time, it will be invalid.
-    If the token has been redeemed, but the manifest has changed, the token will be invalid.
-    """
+    user: ID
+    name: str
+    model_config = ConfigDict(
+        frozen=True, extra="forbid", populate_by_name=True, use_enum_values=True
+    )
 
-    search: Optional[str] = None
-    ids: Optional[Tuple[ID, ...]] = None
-    and_: Optional["RedeemTokenFilter"] = Field(alias="AND", default=None)
-    or_: Optional["RedeemTokenFilter"] = Field(alias="OR", default=None)
-    not_: Optional["RedeemTokenFilter"] = Field(alias="NOT", default=None)
-    distinct: Optional[bool] = Field(alias="DISTINCT", default=None)
+
+class CreateServiceInstanceInput(BaseModel):
+    """No documentation"""
+
+    identifier: str
+    service: ID
+    allowed_users: Optional[Tuple[ID, ...]] = Field(alias="allowedUsers", default=None)
+    allowed_groups: Optional[Tuple[ID, ...]] = Field(
+        alias="allowedGroups", default=None
+    )
+    denied_groups: Optional[Tuple[ID, ...]] = Field(alias="deniedGroups", default=None)
+    denied_users: Optional[Tuple[ID, ...]] = Field(alias="deniedUsers", default=None)
     model_config = ConfigDict(
         frozen=True, extra="forbid", populate_by_name=True, use_enum_values=True
     )
@@ -226,6 +132,35 @@ class DevelopmentClientInput(BaseModel):
     )
 
 
+class GroupFilter(BaseModel):
+    """__doc__"""
+
+    search: Optional[str] = None
+    name: Optional["StrFilterLookup"] = None
+    ids: Optional[Tuple[ID, ...]] = None
+    and_: Optional["GroupFilter"] = Field(alias="AND", default=None)
+    or_: Optional["GroupFilter"] = Field(alias="OR", default=None)
+    not_: Optional["GroupFilter"] = Field(alias="NOT", default=None)
+    distinct: Optional[bool] = Field(alias="DISTINCT", default=None)
+    model_config = ConfigDict(
+        frozen=True, extra="forbid", populate_by_name=True, use_enum_values=True
+    )
+
+
+class LayerFilter(BaseModel):
+    """Layer(id, name, identifier, organization, logo, description, dns_probe, get_probe, kind)"""
+
+    search: Optional[str] = None
+    ids: Optional[Tuple[ID, ...]] = None
+    and_: Optional["LayerFilter"] = Field(alias="AND", default=None)
+    or_: Optional["LayerFilter"] = Field(alias="OR", default=None)
+    not_: Optional["LayerFilter"] = Field(alias="NOT", default=None)
+    distinct: Optional[bool] = Field(alias="DISTINCT", default=None)
+    model_config = ConfigDict(
+        frozen=True, extra="forbid", populate_by_name=True, use_enum_values=True
+    )
+
+
 class ManifestInput(BaseModel):
     """No documentation"""
 
@@ -233,7 +168,7 @@ class ManifestInput(BaseModel):
     version: str
     logo: Optional[str] = None
     scopes: Tuple[str, ...]
-    requirements: Tuple["Requirement", ...]
+    requirements: Tuple["RequirementInput", ...]
     node_id: Optional[str] = Field(alias="nodeId", default=None)
     public_sources: Optional[Tuple["PublicSourceInput", ...]] = Field(
         alias="publicSources", default=None
@@ -243,7 +178,46 @@ class ManifestInput(BaseModel):
     )
 
 
-class Requirement(BaseModel):
+class OffsetPaginationInput(BaseModel):
+    """No documentation"""
+
+    offset: int
+    limit: Optional[int] = None
+    model_config = ConfigDict(
+        frozen=True, extra="forbid", populate_by_name=True, use_enum_values=True
+    )
+
+
+class PublicSourceInput(BaseModel):
+    """No documentation"""
+
+    kind: PublicSourceKind
+    url: str
+    model_config = ConfigDict(
+        frozen=True, extra="forbid", populate_by_name=True, use_enum_values=True
+    )
+
+
+class RedeemTokenFilter(BaseModel):
+    """A redeem token is a token that can be used to redeem the rights to create
+    a client. It is used to give the recipient the right to create a client.
+
+    If the token is not redeemed within the expires_at time, it will be invalid.
+    If the token has been redeemed, but the manifest has changed, the token will be invalid.
+    """
+
+    search: Optional[str] = None
+    ids: Optional[Tuple[ID, ...]] = None
+    and_: Optional["RedeemTokenFilter"] = Field(alias="AND", default=None)
+    or_: Optional["RedeemTokenFilter"] = Field(alias="OR", default=None)
+    not_: Optional["RedeemTokenFilter"] = Field(alias="NOT", default=None)
+    distinct: Optional[bool] = Field(alias="DISTINCT", default=None)
+    model_config = ConfigDict(
+        frozen=True, extra="forbid", populate_by_name=True, use_enum_values=True
+    )
+
+
+class RequirementInput(BaseModel):
     """No documentation"""
 
     service: str
@@ -255,11 +229,43 @@ class Requirement(BaseModel):
     )
 
 
-class PublicSourceInput(BaseModel):
-    """No documentation"""
+class ServiceFilter(BaseModel):
+    """Service(id, name, identifier, logo, description)"""
 
-    kind: PublicSourceKind
-    url: str
+    search: Optional[str] = None
+    ids: Optional[Tuple[ID, ...]] = None
+    and_: Optional["ServiceFilter"] = Field(alias="AND", default=None)
+    or_: Optional["ServiceFilter"] = Field(alias="OR", default=None)
+    not_: Optional["ServiceFilter"] = Field(alias="NOT", default=None)
+    distinct: Optional[bool] = Field(alias="DISTINCT", default=None)
+    model_config = ConfigDict(
+        frozen=True, extra="forbid", populate_by_name=True, use_enum_values=True
+    )
+
+
+class ServiceInstanceFilter(BaseModel):
+    """ServiceInstance(id, composition, release, logo, instance_id, private_key, steward, organization, device, template, public_key, token)"""
+
+    search: Optional[str] = None
+    ids: Optional[Tuple[ID, ...]] = None
+    and_: Optional["ServiceInstanceFilter"] = Field(alias="AND", default=None)
+    or_: Optional["ServiceInstanceFilter"] = Field(alias="OR", default=None)
+    not_: Optional["ServiceInstanceFilter"] = Field(alias="NOT", default=None)
+    distinct: Optional[bool] = Field(alias="DISTINCT", default=None)
+    model_config = ConfigDict(
+        frozen=True, extra="forbid", populate_by_name=True, use_enum_values=True
+    )
+
+
+class ServiceReleaseFilter(BaseModel):
+    """ServiceRelease(id, service, version)"""
+
+    search: Optional[str] = None
+    ids: Optional[Tuple[ID, ...]] = None
+    and_: Optional["ServiceReleaseFilter"] = Field(alias="AND", default=None)
+    or_: Optional["ServiceReleaseFilter"] = Field(alias="OR", default=None)
+    not_: Optional["ServiceReleaseFilter"] = Field(alias="NOT", default=None)
+    distinct: Optional[bool] = Field(alias="DISTINCT", default=None)
     model_config = ConfigDict(
         frozen=True, extra="forbid", populate_by_name=True, use_enum_values=True
     )
@@ -276,17 +282,48 @@ class StashItemInput(BaseModel):
     )
 
 
-class CreateServiceInstanceInput(BaseModel):
+class StrFilterLookup(BaseModel):
     """No documentation"""
 
-    identifier: str
-    service: ID
-    allowed_users: Optional[Tuple[ID, ...]] = Field(alias="allowedUsers", default=None)
-    allowed_groups: Optional[Tuple[ID, ...]] = Field(
-        alias="allowedGroups", default=None
+    exact: Optional[str] = None
+    i_exact: Optional[str] = Field(alias="iExact", default=None)
+    contains: Optional[str] = None
+    i_contains: Optional[str] = Field(alias="iContains", default=None)
+    in_list: Optional[Tuple[str, ...]] = Field(alias="inList", default=None)
+    gt: Optional[str] = None
+    gte: Optional[str] = None
+    lt: Optional[str] = None
+    lte: Optional[str] = None
+    starts_with: Optional[str] = Field(alias="startsWith", default=None)
+    i_starts_with: Optional[str] = Field(alias="iStartsWith", default=None)
+    ends_with: Optional[str] = Field(alias="endsWith", default=None)
+    i_ends_with: Optional[str] = Field(alias="iEndsWith", default=None)
+    range: Optional[Tuple[str, ...]] = None
+    is_null: Optional[bool] = Field(alias="isNull", default=None)
+    regex: Optional[str] = None
+    i_regex: Optional[str] = Field(alias="iRegex", default=None)
+    model_config = ConfigDict(
+        frozen=True, extra="forbid", populate_by_name=True, use_enum_values=True
     )
-    denied_groups: Optional[Tuple[ID, ...]] = Field(alias="deniedGroups", default=None)
-    denied_users: Optional[Tuple[ID, ...]] = Field(alias="deniedUsers", default=None)
+
+
+class UpdateGroupProfileInput(BaseModel):
+    """No documentation"""
+
+    id: ID
+    name: str
+    avatar: ID
+    model_config = ConfigDict(
+        frozen=True, extra="forbid", populate_by_name=True, use_enum_values=True
+    )
+
+
+class UpdateProfileInput(BaseModel):
+    """No documentation"""
+
+    id: ID
+    name: str
+    avatar: ID
     model_config = ConfigDict(
         frozen=True, extra="forbid", populate_by_name=True, use_enum_values=True
     )
@@ -307,44 +344,21 @@ class UpdateServiceInstanceInput(BaseModel):
     )
 
 
-class UpdateProfileInput(BaseModel):
-    """No documentation"""
+class UserFilter(BaseModel):
+    """A User of the System
 
-    id: ID
-    name: str
-    avatar: ID
-    model_config = ConfigDict(
-        frozen=True, extra="forbid", populate_by_name=True, use_enum_values=True
-    )
+    Lok Users are the main users of the system. They can be assigned to groups and have profiles, that can be used to display information about them.
+    Each user is identifier by a unique username, and can have an email address associated with them.
+    """
 
-
-class CreateProfileInput(BaseModel):
-    """No documentation"""
-
-    user: ID
-    name: str
-    model_config = ConfigDict(
-        frozen=True, extra="forbid", populate_by_name=True, use_enum_values=True
-    )
-
-
-class UpdateGroupProfileInput(BaseModel):
-    """No documentation"""
-
-    id: ID
-    name: str
-    avatar: ID
-    model_config = ConfigDict(
-        frozen=True, extra="forbid", populate_by_name=True, use_enum_values=True
-    )
-
-
-class CreateGroupProfileInput(BaseModel):
-    """No documentation"""
-
-    group: ID
-    name: str
-    avatar: ID
+    search: Optional[str] = None
+    username: Optional[StrFilterLookup] = None
+    "Required. 150 characters or fewer. Letters, digits and @/./+/-/_ only."
+    ids: Optional[Tuple[ID, ...]] = None
+    and_: Optional["UserFilter"] = Field(alias="AND", default=None)
+    or_: Optional["UserFilter"] = Field(alias="OR", default=None)
+    not_: Optional["UserFilter"] = Field(alias="NOT", default=None)
+    distinct: Optional[bool] = Field(alias="DISTINCT", default=None)
     model_config = ConfigDict(
         frozen=True, extra="forbid", populate_by_name=True, use_enum_values=True
     )
@@ -857,6 +871,77 @@ class ListRedeemToken(BaseModel):
         type = "RedeemToken"
 
 
+class ServiceLogo(BaseModel):
+    """Small helper around S3-backed stored objects.
+
+    Provides convenience helpers for generating presigned URLs and
+    uploading content."""
+
+    typename: Literal["MediaStore"] = Field(
+        alias="__typename", default="MediaStore", exclude=True
+    )
+    presigned_url: str = Field(alias="presignedUrl")
+    model_config = ConfigDict(frozen=True)
+
+
+class Service(BaseModel):
+    """A Service is a Webservice that a Client might want to access. It is not the configured instance of the service, but the service itself."""
+
+    typename: Literal["Service"] = Field(
+        alias="__typename", default="Service", exclude=True
+    )
+    identifier: str
+    "The identifier of the service. This should be a globally unique string that identifies the service. We encourage you to use the reverse domain name notation. E.g. `com.example.myservice`"
+    id: ID
+    name: str
+    "The name of the service"
+    logo: Optional[ServiceLogo] = Field(default=None)
+    "The logo of the app. This should be a url to a logo that can be used to represent the app."
+    description: Optional[str] = Field(default=None)
+    "The description of the service. This should be a human readable description of the service."
+    model_config = ConfigDict(frozen=True)
+
+    class Meta:
+        """Meta class for Service"""
+
+        document = "fragment Service on Service {\n  identifier\n  id\n  name\n  logo {\n    presignedUrl\n    __typename\n  }\n  description\n  __typename\n}"
+        name = "Service"
+        type = "Service"
+
+
+class ListServiceReleaseService(BaseModel):
+    """A Service is a Webservice that a Client might want to access. It is not the configured instance of the service, but the service itself."""
+
+    typename: Literal["Service"] = Field(
+        alias="__typename", default="Service", exclude=True
+    )
+    id: ID
+    name: str
+    "The name of the service"
+    model_config = ConfigDict(frozen=True)
+
+
+class ListServiceRelease(BaseModel):
+    """A ServiceRelease is a specific release of a Service. It contains the configuration for a particular version of the service."""
+
+    typename: Literal["ServiceRelease"] = Field(
+        alias="__typename", default="ServiceRelease", exclude=True
+    )
+    id: ID
+    service: ListServiceReleaseService
+    "The service that this release belongs to."
+    version: str
+    "The version of the service. This should be a human readable version string."
+    model_config = ConfigDict(frozen=True)
+
+    class Meta:
+        """Meta class for ListServiceRelease"""
+
+        document = "fragment ListServiceRelease on ServiceRelease {\n  id\n  service {\n    id\n    name\n    __typename\n  }\n  version\n  __typename\n}"
+        name = "ListServiceRelease"
+        type = "ServiceRelease"
+
+
 class StashOwner(BaseModel):
     """
     A User is a person that can log in to the system. They are uniquely identified by their username.
@@ -1124,6 +1209,29 @@ class DetailUser(BaseModel):
         type = "User"
 
 
+class ListService(BaseModel):
+    """A Service is a Webservice that a Client might want to access. It is not the configured instance of the service, but the service itself."""
+
+    typename: Literal["Service"] = Field(
+        alias="__typename", default="Service", exclude=True
+    )
+    identifier: str
+    "The identifier of the service. This should be a globally unique string that identifies the service. We encourage you to use the reverse domain name notation. E.g. `com.example.myservice`"
+    id: ID
+    name: str
+    "The name of the service"
+    releases: Tuple[ListServiceRelease, ...]
+    "The releases of the service. A service release is a specific version of a service. It will be configured by a configuration backend and will be used to send to the client as a configuration. It should never contain sensitive information."
+    model_config = ConfigDict(frozen=True)
+
+    class Meta:
+        """Meta class for ListService"""
+
+        document = "fragment ListServiceRelease on ServiceRelease {\n  id\n  service {\n    id\n    name\n    __typename\n  }\n  version\n  __typename\n}\n\nfragment ListService on Service {\n  identifier\n  id\n  name\n  releases {\n    ...ListServiceRelease\n    __typename\n  }\n  __typename\n}"
+        name = "ListService"
+        type = "Service"
+
+
 class ListStash(Stash, BaseModel):
     """
     A Stash
@@ -1174,8 +1282,8 @@ class ListServiceInstance(BaseModel):
         alias="__typename", default="ServiceInstance", exclude=True
     )
     id: ID
-    identifier: str
-    "The identifier of the instance. This is a unique string that identifies the instance. It is used to identify the instance in the code and in the database."
+    instance_id: ID = Field(alias="instanceId")
+    "The instance id of the instance. This is a unique string that identifies the instance. It is used to identify the instance in the code and in the database."
     allowed_users: Tuple[ListUser, ...] = Field(alias="allowedUsers")
     "The users that are allowed to use this instance."
     denied_users: Tuple[ListUser, ...] = Field(alias="deniedUsers")
@@ -1185,7 +1293,7 @@ class ListServiceInstance(BaseModel):
     class Meta:
         """Meta class for ListServiceInstance"""
 
-        document = "fragment ListUser on User {\n  username\n  firstName\n  lastName\n  email\n  avatar\n  id\n  __typename\n}\n\nfragment ListServiceInstance on ServiceInstance {\n  id\n  identifier\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  __typename\n}"
+        document = "fragment ListUser on User {\n  username\n  firstName\n  lastName\n  email\n  avatar\n  id\n  __typename\n}\n\nfragment ListServiceInstance on ServiceInstance {\n  id\n  instanceId\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  __typename\n}"
         name = "ListServiceInstance"
         type = "ServiceInstance"
 
@@ -1235,6 +1343,16 @@ class DescendantChildrenChildrenBase(BaseModel):
     model_config = ConfigDict(frozen=True)
 
 
+class DescendantChildrenChildrenBaseLeafDescendant(
+    Leaf, DescendantChildrenChildrenBase, BaseModel
+):
+    """A leaf of text. This is the most basic descendant and always ends a tree."""
+
+    typename: Literal["LeafDescendant"] = Field(
+        alias="__typename", default="LeafDescendant", exclude=True
+    )
+
+
 class DescendantChildrenChildrenBaseMentionDescendant(
     Mention, DescendantChildrenChildrenBase, BaseModel
 ):
@@ -1255,16 +1373,6 @@ class DescendantChildrenChildrenBaseParagraphDescendant(
     )
 
 
-class DescendantChildrenChildrenBaseLeafDescendant(
-    Leaf, DescendantChildrenChildrenBase, BaseModel
-):
-    """A leaf of text. This is the most basic descendant and always ends a tree."""
-
-    typename: Literal["LeafDescendant"] = Field(
-        alias="__typename", default="LeafDescendant", exclude=True
-    )
-
-
 class DescendantChildrenChildrenBaseCatchAll(DescendantChildrenChildrenBase, BaseModel):
     """Catch all class for DescendantChildrenChildrenBase"""
 
@@ -1280,9 +1388,9 @@ class DescendantChildrenBase(BaseModel):
             Union[
                 Annotated[
                     Union[
+                        DescendantChildrenChildrenBaseLeafDescendant,
                         DescendantChildrenChildrenBaseMentionDescendant,
                         DescendantChildrenChildrenBaseParagraphDescendant,
-                        DescendantChildrenChildrenBaseLeafDescendant,
                     ],
                     Field(discriminator="typename"),
                 ],
@@ -1292,6 +1400,14 @@ class DescendantChildrenBase(BaseModel):
         ]
     ] = Field(default=None)
     model_config = ConfigDict(frozen=True)
+
+
+class DescendantChildrenBaseLeafDescendant(Leaf, DescendantChildrenBase, BaseModel):
+    """A leaf of text. This is the most basic descendant and always ends a tree."""
+
+    typename: Literal["LeafDescendant"] = Field(
+        alias="__typename", default="LeafDescendant", exclude=True
+    )
 
 
 class DescendantChildrenBaseMentionDescendant(
@@ -1314,14 +1430,6 @@ class DescendantChildrenBaseParagraphDescendant(
     )
 
 
-class DescendantChildrenBaseLeafDescendant(Leaf, DescendantChildrenBase, BaseModel):
-    """A leaf of text. This is the most basic descendant and always ends a tree."""
-
-    typename: Literal["LeafDescendant"] = Field(
-        alias="__typename", default="LeafDescendant", exclude=True
-    )
-
-
 class DescendantChildrenBaseCatchAll(DescendantChildrenBase, BaseModel):
     """Catch all class for DescendantChildrenBase"""
 
@@ -1337,9 +1445,9 @@ class DescendantBase(BaseModel):
             Union[
                 Annotated[
                     Union[
+                        DescendantChildrenBaseLeafDescendant,
                         DescendantChildrenBaseMentionDescendant,
                         DescendantChildrenBaseParagraphDescendant,
-                        DescendantChildrenBaseLeafDescendant,
                     ],
                     Field(discriminator="typename"),
                 ],
@@ -1361,9 +1469,9 @@ class DescendantCatch(DescendantBase):
             Union[
                 Annotated[
                     Union[
+                        DescendantChildrenBaseLeafDescendant,
                         DescendantChildrenBaseMentionDescendant,
                         DescendantChildrenBaseParagraphDescendant,
-                        DescendantChildrenBaseLeafDescendant,
                     ],
                     Field(discriminator="typename"),
                 ],
@@ -1372,6 +1480,14 @@ class DescendantCatch(DescendantBase):
             ...,
         ]
     ] = Field(default=None)
+
+
+class DescendantLeafDescendant(Leaf, DescendantBase, BaseModel):
+    """A leaf of text. This is the most basic descendant and always ends a tree."""
+
+    typename: Literal["LeafDescendant"] = Field(
+        alias="__typename", default="LeafDescendant", exclude=True
+    )
 
 
 class DescendantMentionDescendant(Mention, DescendantBase, BaseModel):
@@ -1387,14 +1503,6 @@ class DescendantParagraphDescendant(Paragraph, DescendantBase, BaseModel):
 
     typename: Literal["ParagraphDescendant"] = Field(
         alias="__typename", default="ParagraphDescendant", exclude=True
-    )
-
-
-class DescendantLeafDescendant(Leaf, DescendantBase, BaseModel):
-    """A leaf of text. This is the most basic descendant and always ends a tree."""
-
-    typename: Literal["LeafDescendant"] = Field(
-        alias="__typename", default="LeafDescendant", exclude=True
     )
 
 
@@ -1431,89 +1539,44 @@ class Layer(BaseModel):
     class Meta:
         """Meta class for Layer"""
 
-        document = "fragment ListUser on User {\n  username\n  firstName\n  lastName\n  email\n  avatar\n  id\n  __typename\n}\n\nfragment ListServiceInstance on ServiceInstance {\n  id\n  identifier\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  __typename\n}\n\nfragment Layer on Layer {\n  id\n  name\n  description\n  logo {\n    presignedUrl\n    __typename\n  }\n  instances {\n    ...ListServiceInstance\n    __typename\n  }\n  __typename\n}"
+        document = "fragment ListUser on User {\n  username\n  firstName\n  lastName\n  email\n  avatar\n  id\n  __typename\n}\n\nfragment ListServiceInstance on ServiceInstance {\n  id\n  instanceId\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  __typename\n}\n\nfragment Layer on Layer {\n  id\n  name\n  description\n  logo {\n    presignedUrl\n    __typename\n  }\n  instances {\n    ...ListServiceInstance\n    __typename\n  }\n  __typename\n}"
         name = "Layer"
         type = "Layer"
 
 
-class ListServiceLogo(BaseModel):
-    """Small helper around S3-backed stored objects.
-
-    Provides convenience helpers for generating presigned URLs and
-    uploading content."""
-
-    typename: Literal["MediaStore"] = Field(
-        alias="__typename", default="MediaStore", exclude=True
-    )
-    presigned_url: str = Field(alias="presignedUrl")
-    model_config = ConfigDict(frozen=True)
-
-
-class ListService(BaseModel):
+class ServiceReleaseService(BaseModel):
     """A Service is a Webservice that a Client might want to access. It is not the configured instance of the service, but the service itself."""
 
     typename: Literal["Service"] = Field(
         alias="__typename", default="Service", exclude=True
     )
-    identifier: str
-    "The identifier of the service. This should be a globally unique string that identifies the service. We encourage you to use the reverse domain name notation. E.g. `com.example.myservice`"
     id: ID
     name: str
     "The name of the service"
-    logo: Optional[ListServiceLogo] = Field(default=None)
-    "The logo of the app. This should be a url to a logo that can be used to represent the app."
-    description: Optional[str] = Field(default=None)
-    "The description of the service. This should be a human readable description of the service."
+    model_config = ConfigDict(frozen=True)
+
+
+class ServiceRelease(BaseModel):
+    """A ServiceRelease is a specific release of a Service. It contains the configuration for a particular version of the service."""
+
+    typename: Literal["ServiceRelease"] = Field(
+        alias="__typename", default="ServiceRelease", exclude=True
+    )
+    id: ID
+    service: ServiceReleaseService
+    "The service that this release belongs to."
+    version: str
+    "The version of the service. This should be a human readable version string."
     instances: Tuple[ListServiceInstance, ...]
     "The instances of the service. A service instance is a configured instance of a service. It will be configured by a configuration backend and will be used to send to the client as a configuration. It should never contain sensitive information."
     model_config = ConfigDict(frozen=True)
 
     class Meta:
-        """Meta class for ListService"""
+        """Meta class for ServiceRelease"""
 
-        document = "fragment ListUser on User {\n  username\n  firstName\n  lastName\n  email\n  avatar\n  id\n  __typename\n}\n\nfragment ListServiceInstance on ServiceInstance {\n  id\n  identifier\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  __typename\n}\n\nfragment ListService on Service {\n  identifier\n  id\n  name\n  logo {\n    presignedUrl\n    __typename\n  }\n  description\n  instances {\n    ...ListServiceInstance\n    __typename\n  }\n  __typename\n}"
-        name = "ListService"
-        type = "Service"
-
-
-class ServiceLogo(BaseModel):
-    """Small helper around S3-backed stored objects.
-
-    Provides convenience helpers for generating presigned URLs and
-    uploading content."""
-
-    typename: Literal["MediaStore"] = Field(
-        alias="__typename", default="MediaStore", exclude=True
-    )
-    presigned_url: str = Field(alias="presignedUrl")
-    model_config = ConfigDict(frozen=True)
-
-
-class Service(BaseModel):
-    """A Service is a Webservice that a Client might want to access. It is not the configured instance of the service, but the service itself."""
-
-    typename: Literal["Service"] = Field(
-        alias="__typename", default="Service", exclude=True
-    )
-    identifier: str
-    "The identifier of the service. This should be a globally unique string that identifies the service. We encourage you to use the reverse domain name notation. E.g. `com.example.myservice`"
-    id: ID
-    name: str
-    "The name of the service"
-    logo: Optional[ServiceLogo] = Field(default=None)
-    "The logo of the app. This should be a url to a logo that can be used to represent the app."
-    description: Optional[str] = Field(default=None)
-    "The description of the service. This should be a human readable description of the service."
-    instances: Tuple[ListServiceInstance, ...]
-    "The instances of the service. A service instance is a configured instance of a service. It will be configured by a configuration backend and will be used to send to the client as a configuration. It should never contain sensitive information."
-    model_config = ConfigDict(frozen=True)
-
-    class Meta:
-        """Meta class for Service"""
-
-        document = "fragment ListUser on User {\n  username\n  firstName\n  lastName\n  email\n  avatar\n  id\n  __typename\n}\n\nfragment ListServiceInstance on ServiceInstance {\n  id\n  identifier\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  __typename\n}\n\nfragment Service on Service {\n  identifier\n  id\n  name\n  logo {\n    presignedUrl\n    __typename\n  }\n  description\n  instances {\n    ...ListServiceInstance\n    __typename\n  }\n  __typename\n}"
-        name = "Service"
-        type = "Service"
+        document = "fragment ListUser on User {\n  username\n  firstName\n  lastName\n  email\n  avatar\n  id\n  __typename\n}\n\nfragment ListServiceInstance on ServiceInstance {\n  id\n  instanceId\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  __typename\n}\n\nfragment ServiceRelease on ServiceRelease {\n  id\n  service {\n    id\n    name\n    __typename\n  }\n  version\n  instances {\n    ...ListServiceInstance\n    __typename\n  }\n  __typename\n}"
+        name = "ServiceRelease"
+        type = "ServiceRelease"
 
 
 class ListServiceInstanceMapping(BaseModel):
@@ -1536,7 +1599,7 @@ class ListServiceInstanceMapping(BaseModel):
     class Meta:
         """Meta class for ListServiceInstanceMapping"""
 
-        document = "fragment ListUser on User {\n  username\n  firstName\n  lastName\n  email\n  avatar\n  id\n  __typename\n}\n\nfragment ListClient on Client {\n  id\n  user {\n    id\n    username\n    __typename\n  }\n  name\n  kind\n  release {\n    version\n    logo {\n      presignedUrl\n      __typename\n    }\n    app {\n      id\n      identifier\n      logo {\n        presignedUrl\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment ListServiceInstance on ServiceInstance {\n  id\n  identifier\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  __typename\n}\n\nfragment ListServiceInstanceMapping on ServiceInstanceMapping {\n  id\n  key\n  instance {\n    ...ListServiceInstance\n    __typename\n  }\n  client {\n    ...ListClient\n    __typename\n  }\n  optional\n  __typename\n}"
+        document = "fragment ListUser on User {\n  username\n  firstName\n  lastName\n  email\n  avatar\n  id\n  __typename\n}\n\nfragment ListClient on Client {\n  id\n  user {\n    id\n    username\n    __typename\n  }\n  name\n  kind\n  release {\n    version\n    logo {\n      presignedUrl\n      __typename\n    }\n    app {\n      id\n      identifier\n      logo {\n        presignedUrl\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment ListServiceInstance on ServiceInstance {\n  id\n  instanceId\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  __typename\n}\n\nfragment ListServiceInstanceMapping on ServiceInstanceMapping {\n  id\n  key\n  instance {\n    ...ListServiceInstance\n    __typename\n  }\n  client {\n    ...ListClient\n    __typename\n  }\n  optional\n  __typename\n}"
         name = "ListServiceInstanceMapping"
         type = "ServiceInstanceMapping"
 
@@ -1567,6 +1630,16 @@ class SubthreadCommentDescendantsBase(BaseModel):
     model_config = ConfigDict(frozen=True)
 
 
+class SubthreadCommentDescendantsBaseLeafDescendant(
+    DescendantLeafDescendant, SubthreadCommentDescendantsBase, BaseModel
+):
+    """A leaf of text. This is the most basic descendant and always ends a tree."""
+
+    typename: Literal["LeafDescendant"] = Field(
+        alias="__typename", default="LeafDescendant", exclude=True
+    )
+
+
 class SubthreadCommentDescendantsBaseMentionDescendant(
     DescendantMentionDescendant, SubthreadCommentDescendantsBase, BaseModel
 ):
@@ -1584,16 +1657,6 @@ class SubthreadCommentDescendantsBaseParagraphDescendant(
 
     typename: Literal["ParagraphDescendant"] = Field(
         alias="__typename", default="ParagraphDescendant", exclude=True
-    )
-
-
-class SubthreadCommentDescendantsBaseLeafDescendant(
-    DescendantLeafDescendant, SubthreadCommentDescendantsBase, BaseModel
-):
-    """A leaf of text. This is the most basic descendant and always ends a tree."""
-
-    typename: Literal["LeafDescendant"] = Field(
-        alias="__typename", default="LeafDescendant", exclude=True
     )
 
 
@@ -1631,9 +1694,9 @@ class SubthreadComment(BaseModel):
         Union[
             Annotated[
                 Union[
+                    SubthreadCommentDescendantsBaseLeafDescendant,
                     SubthreadCommentDescendantsBaseMentionDescendant,
                     SubthreadCommentDescendantsBaseParagraphDescendant,
-                    SubthreadCommentDescendantsBaseLeafDescendant,
                 ],
                 Field(discriminator="typename"),
             ],
@@ -1686,7 +1749,7 @@ class DetailClientLogo(BaseModel):
 
 
 class DetailClientOauth2client(BaseModel):
-    """OAuth2Client(id, user, organization, client_id, client_secret, redirect_uris, scope, token_endpoint_auth_method, grant_types, response_types)"""
+    """OAuth2Client(id, membership, client_id, client_secret, redirect_uris, scope, token_endpoint_auth_method, grant_types, response_types, id_token_signed_response_alg)"""
 
     typename: Literal["Oauth2Client"] = Field(
         alias="__typename", default="Oauth2Client", exclude=True
@@ -1729,24 +1792,33 @@ class DetailClient(BaseModel):
     class Meta:
         """Meta class for DetailClient"""
 
-        document = "fragment ListUser on User {\n  username\n  firstName\n  lastName\n  email\n  avatar\n  id\n  __typename\n}\n\nfragment ListApp on App {\n  id\n  identifier\n  logo {\n    presignedUrl\n    __typename\n  }\n  __typename\n}\n\nfragment ListClient on Client {\n  id\n  user {\n    id\n    username\n    __typename\n  }\n  name\n  kind\n  release {\n    version\n    logo {\n      presignedUrl\n      __typename\n    }\n    app {\n      id\n      identifier\n      logo {\n        presignedUrl\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment ListServiceInstance on ServiceInstance {\n  id\n  identifier\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  __typename\n}\n\nfragment ListRelease on Release {\n  id\n  version\n  logo {\n    presignedUrl\n    __typename\n  }\n  app {\n    ...ListApp\n    __typename\n  }\n  __typename\n}\n\nfragment ListServiceInstanceMapping on ServiceInstanceMapping {\n  id\n  key\n  instance {\n    ...ListServiceInstance\n    __typename\n  }\n  client {\n    ...ListClient\n    __typename\n  }\n  optional\n  __typename\n}\n\nfragment DetailClient on Client {\n  id\n  token\n  name\n  user {\n    id\n    username\n    __typename\n  }\n  kind\n  release {\n    ...ListRelease\n    __typename\n  }\n  logo {\n    presignedUrl\n    __typename\n  }\n  oauth2Client {\n    clientId\n    __typename\n  }\n  mappings {\n    ...ListServiceInstanceMapping\n    __typename\n  }\n  issueUrl\n  __typename\n}"
+        document = "fragment ListUser on User {\n  username\n  firstName\n  lastName\n  email\n  avatar\n  id\n  __typename\n}\n\nfragment ListApp on App {\n  id\n  identifier\n  logo {\n    presignedUrl\n    __typename\n  }\n  __typename\n}\n\nfragment ListClient on Client {\n  id\n  user {\n    id\n    username\n    __typename\n  }\n  name\n  kind\n  release {\n    version\n    logo {\n      presignedUrl\n      __typename\n    }\n    app {\n      id\n      identifier\n      logo {\n        presignedUrl\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment ListServiceInstance on ServiceInstance {\n  id\n  instanceId\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  __typename\n}\n\nfragment ListRelease on Release {\n  id\n  version\n  logo {\n    presignedUrl\n    __typename\n  }\n  app {\n    ...ListApp\n    __typename\n  }\n  __typename\n}\n\nfragment ListServiceInstanceMapping on ServiceInstanceMapping {\n  id\n  key\n  instance {\n    ...ListServiceInstance\n    __typename\n  }\n  client {\n    ...ListClient\n    __typename\n  }\n  optional\n  __typename\n}\n\nfragment DetailClient on Client {\n  id\n  token\n  name\n  user {\n    id\n    username\n    __typename\n  }\n  kind\n  release {\n    ...ListRelease\n    __typename\n  }\n  logo {\n    presignedUrl\n    __typename\n  }\n  oauth2Client {\n    clientId\n    __typename\n  }\n  mappings {\n    ...ListServiceInstanceMapping\n    __typename\n  }\n  issueUrl\n  __typename\n}"
         name = "DetailClient"
         type = "Client"
 
 
-class ServiceInstanceService(BaseModel):
+class ServiceInstanceReleaseService(BaseModel):
     """A Service is a Webservice that a Client might want to access. It is not the configured instance of the service, but the service itself."""
 
     typename: Literal["Service"] = Field(
         alias="__typename", default="Service", exclude=True
     )
+    id: ID
     identifier: str
     "The identifier of the service. This should be a globally unique string that identifies the service. We encourage you to use the reverse domain name notation. E.g. `com.example.myservice`"
-    id: ID
-    description: Optional[str] = Field(default=None)
-    "The description of the service. This should be a human readable description of the service."
-    name: str
-    "The name of the service"
+    model_config = ConfigDict(frozen=True)
+
+
+class ServiceInstanceRelease(BaseModel):
+    """A ServiceRelease is a specific release of a Service. It contains the configuration for a particular version of the service."""
+
+    typename: Literal["ServiceRelease"] = Field(
+        alias="__typename", default="ServiceRelease", exclude=True
+    )
+    version: str
+    "The version of the service. This should be a human readable version string."
+    service: ServiceInstanceReleaseService
+    "The service that this release belongs to."
     model_config = ConfigDict(frozen=True)
 
 
@@ -1770,10 +1842,10 @@ class ServiceInstance(BaseModel):
         alias="__typename", default="ServiceInstance", exclude=True
     )
     id: ID
-    identifier: str
-    "The identifier of the instance. This is a unique string that identifies the instance. It is used to identify the instance in the code and in the database."
-    service: ServiceInstanceService
-    "The service that this instance belongs to."
+    instance_id: ID = Field(alias="instanceId")
+    "The instance id of the instance. This is a unique string that identifies the instance. It is used to identify the instance in the code and in the database."
+    release: ServiceInstanceRelease
+    "The service release that this instance belongs to."
     allowed_users: Tuple[ListUser, ...] = Field(alias="allowedUsers")
     "The users that are allowed to use this instance."
     denied_users: Tuple[ListUser, ...] = Field(alias="deniedUsers")
@@ -1791,7 +1863,7 @@ class ServiceInstance(BaseModel):
     class Meta:
         """Meta class for ServiceInstance"""
 
-        document = "fragment ListClient on Client {\n  id\n  user {\n    id\n    username\n    __typename\n  }\n  name\n  kind\n  release {\n    version\n    logo {\n      presignedUrl\n      __typename\n    }\n    app {\n      id\n      identifier\n      logo {\n        presignedUrl\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment ListServiceInstance on ServiceInstance {\n  id\n  identifier\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  __typename\n}\n\nfragment ListGroup on Group {\n  id\n  name\n  profile {\n    id\n    bio\n    avatar {\n      presignedUrl\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment ListServiceInstanceMapping on ServiceInstanceMapping {\n  id\n  key\n  instance {\n    ...ListServiceInstance\n    __typename\n  }\n  client {\n    ...ListClient\n    __typename\n  }\n  optional\n  __typename\n}\n\nfragment ListUser on User {\n  username\n  firstName\n  lastName\n  email\n  avatar\n  id\n  __typename\n}\n\nfragment ServiceInstance on ServiceInstance {\n  id\n  identifier\n  service {\n    identifier\n    id\n    description\n    name\n    __typename\n  }\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  allowedGroups {\n    ...ListGroup\n    __typename\n  }\n  deniedGroups {\n    ...ListGroup\n    __typename\n  }\n  mappings {\n    ...ListServiceInstanceMapping\n    __typename\n  }\n  logo {\n    presignedUrl\n    __typename\n  }\n  __typename\n}"
+        document = "fragment ListClient on Client {\n  id\n  user {\n    id\n    username\n    __typename\n  }\n  name\n  kind\n  release {\n    version\n    logo {\n      presignedUrl\n      __typename\n    }\n    app {\n      id\n      identifier\n      logo {\n        presignedUrl\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment ListServiceInstance on ServiceInstance {\n  id\n  instanceId\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  __typename\n}\n\nfragment ListGroup on Group {\n  id\n  name\n  profile {\n    id\n    bio\n    avatar {\n      presignedUrl\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment ListServiceInstanceMapping on ServiceInstanceMapping {\n  id\n  key\n  instance {\n    ...ListServiceInstance\n    __typename\n  }\n  client {\n    ...ListClient\n    __typename\n  }\n  optional\n  __typename\n}\n\nfragment ListUser on User {\n  username\n  firstName\n  lastName\n  email\n  avatar\n  id\n  __typename\n}\n\nfragment ServiceInstance on ServiceInstance {\n  id\n  instanceId\n  release {\n    version\n    service {\n      id\n      identifier\n      __typename\n    }\n    __typename\n  }\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  allowedGroups {\n    ...ListGroup\n    __typename\n  }\n  deniedGroups {\n    ...ListGroup\n    __typename\n  }\n  mappings {\n    ...ListServiceInstanceMapping\n    __typename\n  }\n  logo {\n    presignedUrl\n    __typename\n  }\n  __typename\n}"
         name = "ServiceInstance"
         type = "ServiceInstance"
 
@@ -1822,6 +1894,16 @@ class ListCommentDescendantsBase(BaseModel):
     model_config = ConfigDict(frozen=True)
 
 
+class ListCommentDescendantsBaseLeafDescendant(
+    DescendantLeafDescendant, ListCommentDescendantsBase, BaseModel
+):
+    """A leaf of text. This is the most basic descendant and always ends a tree."""
+
+    typename: Literal["LeafDescendant"] = Field(
+        alias="__typename", default="LeafDescendant", exclude=True
+    )
+
+
 class ListCommentDescendantsBaseMentionDescendant(
     DescendantMentionDescendant, ListCommentDescendantsBase, BaseModel
 ):
@@ -1839,16 +1921,6 @@ class ListCommentDescendantsBaseParagraphDescendant(
 
     typename: Literal["ParagraphDescendant"] = Field(
         alias="__typename", default="ParagraphDescendant", exclude=True
-    )
-
-
-class ListCommentDescendantsBaseLeafDescendant(
-    DescendantLeafDescendant, ListCommentDescendantsBase, BaseModel
-):
-    """A leaf of text. This is the most basic descendant and always ends a tree."""
-
-    typename: Literal["LeafDescendant"] = Field(
-        alias="__typename", default="LeafDescendant", exclude=True
     )
 
 
@@ -1882,9 +1954,9 @@ class ListComment(BaseModel):
         Union[
             Annotated[
                 Union[
+                    ListCommentDescendantsBaseLeafDescendant,
                     ListCommentDescendantsBaseMentionDescendant,
                     ListCommentDescendantsBaseParagraphDescendant,
-                    ListCommentDescendantsBaseLeafDescendant,
                 ],
                 Field(discriminator="typename"),
             ],
@@ -1937,6 +2009,16 @@ class MentionCommentDescendantsBase(BaseModel):
     model_config = ConfigDict(frozen=True)
 
 
+class MentionCommentDescendantsBaseLeafDescendant(
+    DescendantLeafDescendant, MentionCommentDescendantsBase, BaseModel
+):
+    """A leaf of text. This is the most basic descendant and always ends a tree."""
+
+    typename: Literal["LeafDescendant"] = Field(
+        alias="__typename", default="LeafDescendant", exclude=True
+    )
+
+
 class MentionCommentDescendantsBaseMentionDescendant(
     DescendantMentionDescendant, MentionCommentDescendantsBase, BaseModel
 ):
@@ -1954,16 +2036,6 @@ class MentionCommentDescendantsBaseParagraphDescendant(
 
     typename: Literal["ParagraphDescendant"] = Field(
         alias="__typename", default="ParagraphDescendant", exclude=True
-    )
-
-
-class MentionCommentDescendantsBaseLeafDescendant(
-    DescendantLeafDescendant, MentionCommentDescendantsBase, BaseModel
-):
-    """A leaf of text. This is the most basic descendant and always ends a tree."""
-
-    typename: Literal["LeafDescendant"] = Field(
-        alias="__typename", default="LeafDescendant", exclude=True
     )
 
 
@@ -1997,9 +2069,9 @@ class MentionComment(BaseModel):
         Union[
             Annotated[
                 Union[
+                    MentionCommentDescendantsBaseLeafDescendant,
                     MentionCommentDescendantsBaseMentionDescendant,
                     MentionCommentDescendantsBaseParagraphDescendant,
-                    MentionCommentDescendantsBaseLeafDescendant,
                 ],
                 Field(discriminator="typename"),
             ],
@@ -2058,6 +2130,16 @@ class DetailCommentDescendantsBase(BaseModel):
     model_config = ConfigDict(frozen=True)
 
 
+class DetailCommentDescendantsBaseLeafDescendant(
+    DescendantLeafDescendant, DetailCommentDescendantsBase, BaseModel
+):
+    """A leaf of text. This is the most basic descendant and always ends a tree."""
+
+    typename: Literal["LeafDescendant"] = Field(
+        alias="__typename", default="LeafDescendant", exclude=True
+    )
+
+
 class DetailCommentDescendantsBaseMentionDescendant(
     DescendantMentionDescendant, DetailCommentDescendantsBase, BaseModel
 ):
@@ -2075,16 +2157,6 @@ class DetailCommentDescendantsBaseParagraphDescendant(
 
     typename: Literal["ParagraphDescendant"] = Field(
         alias="__typename", default="ParagraphDescendant", exclude=True
-    )
-
-
-class DetailCommentDescendantsBaseLeafDescendant(
-    DescendantLeafDescendant, DetailCommentDescendantsBase, BaseModel
-):
-    """A leaf of text. This is the most basic descendant and always ends a tree."""
-
-    typename: Literal["LeafDescendant"] = Field(
-        alias="__typename", default="LeafDescendant", exclude=True
     )
 
 
@@ -2118,9 +2190,9 @@ class DetailComment(BaseModel):
         Union[
             Annotated[
                 Union[
+                    DetailCommentDescendantsBaseLeafDescendant,
                     DetailCommentDescendantsBaseMentionDescendant,
                     DetailCommentDescendantsBaseParagraphDescendant,
-                    DetailCommentDescendantsBaseLeafDescendant,
                 ],
                 Field(discriminator="typename"),
             ],
@@ -2167,7 +2239,7 @@ class CreateClientMutation(BaseModel):
     class Meta:
         """Meta class for CreateClient"""
 
-        document = "fragment ListUser on User {\n  username\n  firstName\n  lastName\n  email\n  avatar\n  id\n  __typename\n}\n\nfragment ListApp on App {\n  id\n  identifier\n  logo {\n    presignedUrl\n    __typename\n  }\n  __typename\n}\n\nfragment ListClient on Client {\n  id\n  user {\n    id\n    username\n    __typename\n  }\n  name\n  kind\n  release {\n    version\n    logo {\n      presignedUrl\n      __typename\n    }\n    app {\n      id\n      identifier\n      logo {\n        presignedUrl\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment ListServiceInstance on ServiceInstance {\n  id\n  identifier\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  __typename\n}\n\nfragment ListRelease on Release {\n  id\n  version\n  logo {\n    presignedUrl\n    __typename\n  }\n  app {\n    ...ListApp\n    __typename\n  }\n  __typename\n}\n\nfragment ListServiceInstanceMapping on ServiceInstanceMapping {\n  id\n  key\n  instance {\n    ...ListServiceInstance\n    __typename\n  }\n  client {\n    ...ListClient\n    __typename\n  }\n  optional\n  __typename\n}\n\nfragment DetailClient on Client {\n  id\n  token\n  name\n  user {\n    id\n    username\n    __typename\n  }\n  kind\n  release {\n    ...ListRelease\n    __typename\n  }\n  logo {\n    presignedUrl\n    __typename\n  }\n  oauth2Client {\n    clientId\n    __typename\n  }\n  mappings {\n    ...ListServiceInstanceMapping\n    __typename\n  }\n  issueUrl\n  __typename\n}\n\nmutation CreateClient($input: DevelopmentClientInput!) {\n  createDevelopmentalClient(input: $input) {\n    ...DetailClient\n    __typename\n  }\n}"
+        document = "fragment ListUser on User {\n  username\n  firstName\n  lastName\n  email\n  avatar\n  id\n  __typename\n}\n\nfragment ListApp on App {\n  id\n  identifier\n  logo {\n    presignedUrl\n    __typename\n  }\n  __typename\n}\n\nfragment ListClient on Client {\n  id\n  user {\n    id\n    username\n    __typename\n  }\n  name\n  kind\n  release {\n    version\n    logo {\n      presignedUrl\n      __typename\n    }\n    app {\n      id\n      identifier\n      logo {\n        presignedUrl\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment ListServiceInstance on ServiceInstance {\n  id\n  instanceId\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  __typename\n}\n\nfragment ListRelease on Release {\n  id\n  version\n  logo {\n    presignedUrl\n    __typename\n  }\n  app {\n    ...ListApp\n    __typename\n  }\n  __typename\n}\n\nfragment ListServiceInstanceMapping on ServiceInstanceMapping {\n  id\n  key\n  instance {\n    ...ListServiceInstance\n    __typename\n  }\n  client {\n    ...ListClient\n    __typename\n  }\n  optional\n  __typename\n}\n\nfragment DetailClient on Client {\n  id\n  token\n  name\n  user {\n    id\n    username\n    __typename\n  }\n  kind\n  release {\n    ...ListRelease\n    __typename\n  }\n  logo {\n    presignedUrl\n    __typename\n  }\n  oauth2Client {\n    clientId\n    __typename\n  }\n  mappings {\n    ...ListServiceInstanceMapping\n    __typename\n  }\n  issueUrl\n  __typename\n}\n\nmutation CreateClient($input: DevelopmentClientInput!) {\n  createDevelopmentalClient(input: $input) {\n    ...DetailClient\n    __typename\n  }\n}"
 
 
 class CreateCommentMutation(BaseModel):
@@ -2273,7 +2345,7 @@ class UpdateServiceInstanceMutation(BaseModel):
     class Meta:
         """Meta class for UpdateServiceInstance"""
 
-        document = "fragment ListClient on Client {\n  id\n  user {\n    id\n    username\n    __typename\n  }\n  name\n  kind\n  release {\n    version\n    logo {\n      presignedUrl\n      __typename\n    }\n    app {\n      id\n      identifier\n      logo {\n        presignedUrl\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment ListServiceInstance on ServiceInstance {\n  id\n  identifier\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  __typename\n}\n\nfragment ListGroup on Group {\n  id\n  name\n  profile {\n    id\n    bio\n    avatar {\n      presignedUrl\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment ListServiceInstanceMapping on ServiceInstanceMapping {\n  id\n  key\n  instance {\n    ...ListServiceInstance\n    __typename\n  }\n  client {\n    ...ListClient\n    __typename\n  }\n  optional\n  __typename\n}\n\nfragment ListUser on User {\n  username\n  firstName\n  lastName\n  email\n  avatar\n  id\n  __typename\n}\n\nfragment ServiceInstance on ServiceInstance {\n  id\n  identifier\n  service {\n    identifier\n    id\n    description\n    name\n    __typename\n  }\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  allowedGroups {\n    ...ListGroup\n    __typename\n  }\n  deniedGroups {\n    ...ListGroup\n    __typename\n  }\n  mappings {\n    ...ListServiceInstanceMapping\n    __typename\n  }\n  logo {\n    presignedUrl\n    __typename\n  }\n  __typename\n}\n\nmutation UpdateServiceInstance($input: UpdateServiceInstanceInput!) {\n  updateServiceInstance(input: $input) {\n    ...ServiceInstance\n    __typename\n  }\n}"
+        document = "fragment ListClient on Client {\n  id\n  user {\n    id\n    username\n    __typename\n  }\n  name\n  kind\n  release {\n    version\n    logo {\n      presignedUrl\n      __typename\n    }\n    app {\n      id\n      identifier\n      logo {\n        presignedUrl\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment ListServiceInstance on ServiceInstance {\n  id\n  instanceId\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  __typename\n}\n\nfragment ListGroup on Group {\n  id\n  name\n  profile {\n    id\n    bio\n    avatar {\n      presignedUrl\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment ListServiceInstanceMapping on ServiceInstanceMapping {\n  id\n  key\n  instance {\n    ...ListServiceInstance\n    __typename\n  }\n  client {\n    ...ListClient\n    __typename\n  }\n  optional\n  __typename\n}\n\nfragment ListUser on User {\n  username\n  firstName\n  lastName\n  email\n  avatar\n  id\n  __typename\n}\n\nfragment ServiceInstance on ServiceInstance {\n  id\n  instanceId\n  release {\n    version\n    service {\n      id\n      identifier\n      __typename\n    }\n    __typename\n  }\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  allowedGroups {\n    ...ListGroup\n    __typename\n  }\n  deniedGroups {\n    ...ListGroup\n    __typename\n  }\n  mappings {\n    ...ListServiceInstanceMapping\n    __typename\n  }\n  logo {\n    presignedUrl\n    __typename\n  }\n  __typename\n}\n\nmutation UpdateServiceInstance($input: UpdateServiceInstanceInput!) {\n  updateServiceInstance(input: $input) {\n    ...ServiceInstance\n    __typename\n  }\n}"
 
 
 class CreateServiceInstanceMutation(BaseModel):
@@ -2290,7 +2362,7 @@ class CreateServiceInstanceMutation(BaseModel):
     class Meta:
         """Meta class for CreateServiceInstance"""
 
-        document = "fragment ListClient on Client {\n  id\n  user {\n    id\n    username\n    __typename\n  }\n  name\n  kind\n  release {\n    version\n    logo {\n      presignedUrl\n      __typename\n    }\n    app {\n      id\n      identifier\n      logo {\n        presignedUrl\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment ListServiceInstance on ServiceInstance {\n  id\n  identifier\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  __typename\n}\n\nfragment ListGroup on Group {\n  id\n  name\n  profile {\n    id\n    bio\n    avatar {\n      presignedUrl\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment ListServiceInstanceMapping on ServiceInstanceMapping {\n  id\n  key\n  instance {\n    ...ListServiceInstance\n    __typename\n  }\n  client {\n    ...ListClient\n    __typename\n  }\n  optional\n  __typename\n}\n\nfragment ListUser on User {\n  username\n  firstName\n  lastName\n  email\n  avatar\n  id\n  __typename\n}\n\nfragment ServiceInstance on ServiceInstance {\n  id\n  identifier\n  service {\n    identifier\n    id\n    description\n    name\n    __typename\n  }\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  allowedGroups {\n    ...ListGroup\n    __typename\n  }\n  deniedGroups {\n    ...ListGroup\n    __typename\n  }\n  mappings {\n    ...ListServiceInstanceMapping\n    __typename\n  }\n  logo {\n    presignedUrl\n    __typename\n  }\n  __typename\n}\n\nmutation CreateServiceInstance($input: CreateServiceInstanceInput!) {\n  createServiceInstance(input: $input) {\n    ...ServiceInstance\n    __typename\n  }\n}"
+        document = "fragment ListClient on Client {\n  id\n  user {\n    id\n    username\n    __typename\n  }\n  name\n  kind\n  release {\n    version\n    logo {\n      presignedUrl\n      __typename\n    }\n    app {\n      id\n      identifier\n      logo {\n        presignedUrl\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment ListServiceInstance on ServiceInstance {\n  id\n  instanceId\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  __typename\n}\n\nfragment ListGroup on Group {\n  id\n  name\n  profile {\n    id\n    bio\n    avatar {\n      presignedUrl\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment ListServiceInstanceMapping on ServiceInstanceMapping {\n  id\n  key\n  instance {\n    ...ListServiceInstance\n    __typename\n  }\n  client {\n    ...ListClient\n    __typename\n  }\n  optional\n  __typename\n}\n\nfragment ListUser on User {\n  username\n  firstName\n  lastName\n  email\n  avatar\n  id\n  __typename\n}\n\nfragment ServiceInstance on ServiceInstance {\n  id\n  instanceId\n  release {\n    version\n    service {\n      id\n      identifier\n      __typename\n    }\n    __typename\n  }\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  allowedGroups {\n    ...ListGroup\n    __typename\n  }\n  deniedGroups {\n    ...ListGroup\n    __typename\n  }\n  mappings {\n    ...ListServiceInstanceMapping\n    __typename\n  }\n  logo {\n    presignedUrl\n    __typename\n  }\n  __typename\n}\n\nmutation CreateServiceInstance($input: CreateServiceInstanceInput!) {\n  createServiceInstance(input: $input) {\n    ...ServiceInstance\n    __typename\n  }\n}"
 
 
 class CreateUserProfileMutation(BaseModel):
@@ -2504,7 +2576,7 @@ class DetailClientQuery(BaseModel):
     class Meta:
         """Meta class for DetailClient"""
 
-        document = "fragment ListUser on User {\n  username\n  firstName\n  lastName\n  email\n  avatar\n  id\n  __typename\n}\n\nfragment ListApp on App {\n  id\n  identifier\n  logo {\n    presignedUrl\n    __typename\n  }\n  __typename\n}\n\nfragment ListClient on Client {\n  id\n  user {\n    id\n    username\n    __typename\n  }\n  name\n  kind\n  release {\n    version\n    logo {\n      presignedUrl\n      __typename\n    }\n    app {\n      id\n      identifier\n      logo {\n        presignedUrl\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment ListServiceInstance on ServiceInstance {\n  id\n  identifier\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  __typename\n}\n\nfragment ListRelease on Release {\n  id\n  version\n  logo {\n    presignedUrl\n    __typename\n  }\n  app {\n    ...ListApp\n    __typename\n  }\n  __typename\n}\n\nfragment ListServiceInstanceMapping on ServiceInstanceMapping {\n  id\n  key\n  instance {\n    ...ListServiceInstance\n    __typename\n  }\n  client {\n    ...ListClient\n    __typename\n  }\n  optional\n  __typename\n}\n\nfragment DetailClient on Client {\n  id\n  token\n  name\n  user {\n    id\n    username\n    __typename\n  }\n  kind\n  release {\n    ...ListRelease\n    __typename\n  }\n  logo {\n    presignedUrl\n    __typename\n  }\n  oauth2Client {\n    clientId\n    __typename\n  }\n  mappings {\n    ...ListServiceInstanceMapping\n    __typename\n  }\n  issueUrl\n  __typename\n}\n\nquery DetailClient($id: ID!) {\n  client(id: $id) {\n    ...DetailClient\n    __typename\n  }\n}"
+        document = "fragment ListUser on User {\n  username\n  firstName\n  lastName\n  email\n  avatar\n  id\n  __typename\n}\n\nfragment ListApp on App {\n  id\n  identifier\n  logo {\n    presignedUrl\n    __typename\n  }\n  __typename\n}\n\nfragment ListClient on Client {\n  id\n  user {\n    id\n    username\n    __typename\n  }\n  name\n  kind\n  release {\n    version\n    logo {\n      presignedUrl\n      __typename\n    }\n    app {\n      id\n      identifier\n      logo {\n        presignedUrl\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment ListServiceInstance on ServiceInstance {\n  id\n  instanceId\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  __typename\n}\n\nfragment ListRelease on Release {\n  id\n  version\n  logo {\n    presignedUrl\n    __typename\n  }\n  app {\n    ...ListApp\n    __typename\n  }\n  __typename\n}\n\nfragment ListServiceInstanceMapping on ServiceInstanceMapping {\n  id\n  key\n  instance {\n    ...ListServiceInstance\n    __typename\n  }\n  client {\n    ...ListClient\n    __typename\n  }\n  optional\n  __typename\n}\n\nfragment DetailClient on Client {\n  id\n  token\n  name\n  user {\n    id\n    username\n    __typename\n  }\n  kind\n  release {\n    ...ListRelease\n    __typename\n  }\n  logo {\n    presignedUrl\n    __typename\n  }\n  oauth2Client {\n    clientId\n    __typename\n  }\n  mappings {\n    ...ListServiceInstanceMapping\n    __typename\n  }\n  issueUrl\n  __typename\n}\n\nquery DetailClient($id: ID!) {\n  client(id: $id) {\n    ...DetailClient\n    __typename\n  }\n}"
 
 
 class MyManagedClientsQuery(BaseModel):
@@ -2538,7 +2610,7 @@ class ClientQuery(BaseModel):
     class Meta:
         """Meta class for Client"""
 
-        document = "fragment ListUser on User {\n  username\n  firstName\n  lastName\n  email\n  avatar\n  id\n  __typename\n}\n\nfragment ListApp on App {\n  id\n  identifier\n  logo {\n    presignedUrl\n    __typename\n  }\n  __typename\n}\n\nfragment ListClient on Client {\n  id\n  user {\n    id\n    username\n    __typename\n  }\n  name\n  kind\n  release {\n    version\n    logo {\n      presignedUrl\n      __typename\n    }\n    app {\n      id\n      identifier\n      logo {\n        presignedUrl\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment ListServiceInstance on ServiceInstance {\n  id\n  identifier\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  __typename\n}\n\nfragment ListRelease on Release {\n  id\n  version\n  logo {\n    presignedUrl\n    __typename\n  }\n  app {\n    ...ListApp\n    __typename\n  }\n  __typename\n}\n\nfragment ListServiceInstanceMapping on ServiceInstanceMapping {\n  id\n  key\n  instance {\n    ...ListServiceInstance\n    __typename\n  }\n  client {\n    ...ListClient\n    __typename\n  }\n  optional\n  __typename\n}\n\nfragment DetailClient on Client {\n  id\n  token\n  name\n  user {\n    id\n    username\n    __typename\n  }\n  kind\n  release {\n    ...ListRelease\n    __typename\n  }\n  logo {\n    presignedUrl\n    __typename\n  }\n  oauth2Client {\n    clientId\n    __typename\n  }\n  mappings {\n    ...ListServiceInstanceMapping\n    __typename\n  }\n  issueUrl\n  __typename\n}\n\nquery Client($clientId: ID!) {\n  client(clientId: $clientId) {\n    ...DetailClient\n    __typename\n  }\n}"
+        document = "fragment ListUser on User {\n  username\n  firstName\n  lastName\n  email\n  avatar\n  id\n  __typename\n}\n\nfragment ListApp on App {\n  id\n  identifier\n  logo {\n    presignedUrl\n    __typename\n  }\n  __typename\n}\n\nfragment ListClient on Client {\n  id\n  user {\n    id\n    username\n    __typename\n  }\n  name\n  kind\n  release {\n    version\n    logo {\n      presignedUrl\n      __typename\n    }\n    app {\n      id\n      identifier\n      logo {\n        presignedUrl\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment ListServiceInstance on ServiceInstance {\n  id\n  instanceId\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  __typename\n}\n\nfragment ListRelease on Release {\n  id\n  version\n  logo {\n    presignedUrl\n    __typename\n  }\n  app {\n    ...ListApp\n    __typename\n  }\n  __typename\n}\n\nfragment ListServiceInstanceMapping on ServiceInstanceMapping {\n  id\n  key\n  instance {\n    ...ListServiceInstance\n    __typename\n  }\n  client {\n    ...ListClient\n    __typename\n  }\n  optional\n  __typename\n}\n\nfragment DetailClient on Client {\n  id\n  token\n  name\n  user {\n    id\n    username\n    __typename\n  }\n  kind\n  release {\n    ...ListRelease\n    __typename\n  }\n  logo {\n    presignedUrl\n    __typename\n  }\n  oauth2Client {\n    clientId\n    __typename\n  }\n  mappings {\n    ...ListServiceInstanceMapping\n    __typename\n  }\n  issueUrl\n  __typename\n}\n\nquery Client($clientId: ID!) {\n  client(clientId: $clientId) {\n    ...DetailClient\n    __typename\n  }\n}"
 
 
 class CommentsForQuery(BaseModel):
@@ -2691,7 +2763,7 @@ class DetailLayerQuery(BaseModel):
     class Meta:
         """Meta class for DetailLayer"""
 
-        document = "fragment ListUser on User {\n  username\n  firstName\n  lastName\n  email\n  avatar\n  id\n  __typename\n}\n\nfragment ListServiceInstance on ServiceInstance {\n  id\n  identifier\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  __typename\n}\n\nfragment Layer on Layer {\n  id\n  name\n  description\n  logo {\n    presignedUrl\n    __typename\n  }\n  instances {\n    ...ListServiceInstance\n    __typename\n  }\n  __typename\n}\n\nquery DetailLayer($id: ID!) {\n  layer(id: $id) {\n    ...Layer\n    __typename\n  }\n}"
+        document = "fragment ListUser on User {\n  username\n  firstName\n  lastName\n  email\n  avatar\n  id\n  __typename\n}\n\nfragment ListServiceInstance on ServiceInstance {\n  id\n  instanceId\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  __typename\n}\n\nfragment Layer on Layer {\n  id\n  name\n  description\n  logo {\n    presignedUrl\n    __typename\n  }\n  instances {\n    ...ListServiceInstance\n    __typename\n  }\n  __typename\n}\n\nquery DetailLayer($id: ID!) {\n  layer(id: $id) {\n    ...Layer\n    __typename\n  }\n}"
 
 
 class RedeemTokensQuery(BaseModel):
@@ -2861,7 +2933,7 @@ class ListServiceInstancesQuery(BaseModel):
     class Meta:
         """Meta class for ListServiceInstances"""
 
-        document = "fragment ListUser on User {\n  username\n  firstName\n  lastName\n  email\n  avatar\n  id\n  __typename\n}\n\nfragment ListServiceInstance on ServiceInstance {\n  id\n  identifier\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  __typename\n}\n\nquery ListServiceInstances($pagination: OffsetPaginationInput, $filters: ServiceInstanceFilter) {\n  serviceInstances(pagination: $pagination, filters: $filters) {\n    ...ListServiceInstance\n    __typename\n  }\n}"
+        document = "fragment ListUser on User {\n  username\n  firstName\n  lastName\n  email\n  avatar\n  id\n  __typename\n}\n\nfragment ListServiceInstance on ServiceInstance {\n  id\n  instanceId\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  __typename\n}\n\nquery ListServiceInstances($pagination: OffsetPaginationInput, $filters: ServiceInstanceFilter) {\n  serviceInstances(pagination: $pagination, filters: $filters) {\n    ...ListServiceInstance\n    __typename\n  }\n}"
 
 
 class GetServiceInstanceQuery(BaseModel):
@@ -2878,7 +2950,42 @@ class GetServiceInstanceQuery(BaseModel):
     class Meta:
         """Meta class for GetServiceInstance"""
 
-        document = "fragment ListClient on Client {\n  id\n  user {\n    id\n    username\n    __typename\n  }\n  name\n  kind\n  release {\n    version\n    logo {\n      presignedUrl\n      __typename\n    }\n    app {\n      id\n      identifier\n      logo {\n        presignedUrl\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment ListServiceInstance on ServiceInstance {\n  id\n  identifier\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  __typename\n}\n\nfragment ListGroup on Group {\n  id\n  name\n  profile {\n    id\n    bio\n    avatar {\n      presignedUrl\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment ListServiceInstanceMapping on ServiceInstanceMapping {\n  id\n  key\n  instance {\n    ...ListServiceInstance\n    __typename\n  }\n  client {\n    ...ListClient\n    __typename\n  }\n  optional\n  __typename\n}\n\nfragment ListUser on User {\n  username\n  firstName\n  lastName\n  email\n  avatar\n  id\n  __typename\n}\n\nfragment ServiceInstance on ServiceInstance {\n  id\n  identifier\n  service {\n    identifier\n    id\n    description\n    name\n    __typename\n  }\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  allowedGroups {\n    ...ListGroup\n    __typename\n  }\n  deniedGroups {\n    ...ListGroup\n    __typename\n  }\n  mappings {\n    ...ListServiceInstanceMapping\n    __typename\n  }\n  logo {\n    presignedUrl\n    __typename\n  }\n  __typename\n}\n\nquery GetServiceInstance($id: ID!) {\n  serviceInstance(id: $id) {\n    ...ServiceInstance\n    __typename\n  }\n}"
+        document = "fragment ListClient on Client {\n  id\n  user {\n    id\n    username\n    __typename\n  }\n  name\n  kind\n  release {\n    version\n    logo {\n      presignedUrl\n      __typename\n    }\n    app {\n      id\n      identifier\n      logo {\n        presignedUrl\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment ListServiceInstance on ServiceInstance {\n  id\n  instanceId\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  __typename\n}\n\nfragment ListGroup on Group {\n  id\n  name\n  profile {\n    id\n    bio\n    avatar {\n      presignedUrl\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment ListServiceInstanceMapping on ServiceInstanceMapping {\n  id\n  key\n  instance {\n    ...ListServiceInstance\n    __typename\n  }\n  client {\n    ...ListClient\n    __typename\n  }\n  optional\n  __typename\n}\n\nfragment ListUser on User {\n  username\n  firstName\n  lastName\n  email\n  avatar\n  id\n  __typename\n}\n\nfragment ServiceInstance on ServiceInstance {\n  id\n  instanceId\n  release {\n    version\n    service {\n      id\n      identifier\n      __typename\n    }\n    __typename\n  }\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  allowedGroups {\n    ...ListGroup\n    __typename\n  }\n  deniedGroups {\n    ...ListGroup\n    __typename\n  }\n  mappings {\n    ...ListServiceInstanceMapping\n    __typename\n  }\n  logo {\n    presignedUrl\n    __typename\n  }\n  __typename\n}\n\nquery GetServiceInstance($id: ID!) {\n  serviceInstance(id: $id) {\n    ...ServiceInstance\n    __typename\n  }\n}"
+
+
+class ListServiceReleasesQuery(BaseModel):
+    """No documentation found for this operation."""
+
+    service_releases: Tuple[ListServiceRelease, ...] = Field(alias="serviceReleases")
+
+    class Arguments(BaseModel):
+        """Arguments for ListServiceReleases"""
+
+        pagination: Optional[OffsetPaginationInput] = Field(default=None)
+        filters: Optional[ServiceReleaseFilter] = Field(default=None)
+        model_config = ConfigDict(populate_by_name=True)
+
+    class Meta:
+        """Meta class for ListServiceReleases"""
+
+        document = "fragment ListServiceRelease on ServiceRelease {\n  id\n  service {\n    id\n    name\n    __typename\n  }\n  version\n  __typename\n}\n\nquery ListServiceReleases($pagination: OffsetPaginationInput, $filters: ServiceReleaseFilter) {\n  serviceReleases(pagination: $pagination, filters: $filters) {\n    ...ListServiceRelease\n    __typename\n  }\n}"
+
+
+class GetServiceReleaseQuery(BaseModel):
+    """No documentation found for this operation."""
+
+    service_release: ServiceRelease = Field(alias="serviceRelease")
+
+    class Arguments(BaseModel):
+        """Arguments for GetServiceRelease"""
+
+        id: ID
+        model_config = ConfigDict(populate_by_name=True)
+
+    class Meta:
+        """Meta class for GetServiceRelease"""
+
+        document = "fragment ListUser on User {\n  username\n  firstName\n  lastName\n  email\n  avatar\n  id\n  __typename\n}\n\nfragment ListServiceInstance on ServiceInstance {\n  id\n  instanceId\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  __typename\n}\n\nfragment ServiceRelease on ServiceRelease {\n  id\n  service {\n    id\n    name\n    __typename\n  }\n  version\n  instances {\n    ...ListServiceInstance\n    __typename\n  }\n  __typename\n}\n\nquery GetServiceRelease($id: ID!) {\n  serviceRelease(id: $id) {\n    ...ServiceRelease\n    __typename\n  }\n}"
 
 
 class ListServicesQuery(BaseModel):
@@ -2896,7 +3003,7 @@ class ListServicesQuery(BaseModel):
     class Meta:
         """Meta class for ListServices"""
 
-        document = "fragment ListUser on User {\n  username\n  firstName\n  lastName\n  email\n  avatar\n  id\n  __typename\n}\n\nfragment ListServiceInstance on ServiceInstance {\n  id\n  identifier\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  __typename\n}\n\nfragment ListService on Service {\n  identifier\n  id\n  name\n  logo {\n    presignedUrl\n    __typename\n  }\n  description\n  instances {\n    ...ListServiceInstance\n    __typename\n  }\n  __typename\n}\n\nquery ListServices($pagination: OffsetPaginationInput, $filters: ServiceFilter) {\n  services(pagination: $pagination, filters: $filters) {\n    ...ListService\n    __typename\n  }\n}"
+        document = "fragment ListServiceRelease on ServiceRelease {\n  id\n  service {\n    id\n    name\n    __typename\n  }\n  version\n  __typename\n}\n\nfragment ListService on Service {\n  identifier\n  id\n  name\n  releases {\n    ...ListServiceRelease\n    __typename\n  }\n  __typename\n}\n\nquery ListServices($pagination: OffsetPaginationInput, $filters: ServiceFilter) {\n  services(pagination: $pagination, filters: $filters) {\n    ...ListService\n    __typename\n  }\n}"
 
 
 class GetServiceQuery(BaseModel):
@@ -2913,7 +3020,7 @@ class GetServiceQuery(BaseModel):
     class Meta:
         """Meta class for GetService"""
 
-        document = "fragment ListUser on User {\n  username\n  firstName\n  lastName\n  email\n  avatar\n  id\n  __typename\n}\n\nfragment ListServiceInstance on ServiceInstance {\n  id\n  identifier\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  __typename\n}\n\nfragment Service on Service {\n  identifier\n  id\n  name\n  logo {\n    presignedUrl\n    __typename\n  }\n  description\n  instances {\n    ...ListServiceInstance\n    __typename\n  }\n  __typename\n}\n\nquery GetService($id: ID!) {\n  service(id: $id) {\n    ...Service\n    __typename\n  }\n}"
+        document = "fragment Service on Service {\n  identifier\n  id\n  name\n  logo {\n    presignedUrl\n    __typename\n  }\n  description\n  __typename\n}\n\nquery GetService($id: ID!) {\n  service(id: $id) {\n    ...Service\n    __typename\n  }\n}"
 
 
 class MyStashesQuery(BaseModel):
@@ -4696,6 +4803,86 @@ def get_service_instance(id: ID, rath: Optional[UnlokRath] = None) -> ServiceIns
     return execute(GetServiceInstanceQuery, {"id": id}, rath=rath).service_instance
 
 
+async def alist_service_releases(
+    pagination: Optional[OffsetPaginationInput] = None,
+    filters: Optional[ServiceReleaseFilter] = None,
+    rath: Optional[UnlokRath] = None,
+) -> Tuple[ListServiceRelease, ...]:
+    """ListServiceReleases
+
+
+    Args:
+        pagination (Optional[OffsetPaginationInput], optional): No description.
+        filters (Optional[ServiceReleaseFilter], optional): No description.
+        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+
+    Returns:
+        List[ListServiceRelease]
+    """
+    return (
+        await aexecute(
+            ListServiceReleasesQuery,
+            {"pagination": pagination, "filters": filters},
+            rath=rath,
+        )
+    ).service_releases
+
+
+def list_service_releases(
+    pagination: Optional[OffsetPaginationInput] = None,
+    filters: Optional[ServiceReleaseFilter] = None,
+    rath: Optional[UnlokRath] = None,
+) -> Tuple[ListServiceRelease, ...]:
+    """ListServiceReleases
+
+
+    Args:
+        pagination (Optional[OffsetPaginationInput], optional): No description.
+        filters (Optional[ServiceReleaseFilter], optional): No description.
+        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+
+    Returns:
+        List[ListServiceRelease]
+    """
+    return execute(
+        ListServiceReleasesQuery,
+        {"pagination": pagination, "filters": filters},
+        rath=rath,
+    ).service_releases
+
+
+async def aget_service_release(
+    id: ID, rath: Optional[UnlokRath] = None
+) -> ServiceRelease:
+    """GetServiceRelease
+
+
+    Args:
+        id (ID): No description
+        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+
+    Returns:
+        ServiceRelease
+    """
+    return (
+        await aexecute(GetServiceReleaseQuery, {"id": id}, rath=rath)
+    ).service_release
+
+
+def get_service_release(id: ID, rath: Optional[UnlokRath] = None) -> ServiceRelease:
+    """GetServiceRelease
+
+
+    Args:
+        id (ID): No description
+        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+
+    Returns:
+        ServiceRelease
+    """
+    return execute(GetServiceReleaseQuery, {"id": id}, rath=rath).service_release
+
+
 async def alist_services(
     pagination: Optional[OffsetPaginationInput] = None,
     filters: Optional[ServiceFilter] = None,
@@ -5038,4 +5225,5 @@ ManifestInput.model_rebuild()
 RedeemTokenFilter.model_rebuild()
 ServiceFilter.model_rebuild()
 ServiceInstanceFilter.model_rebuild()
+ServiceReleaseFilter.model_rebuild()
 UserFilter.model_rebuild()

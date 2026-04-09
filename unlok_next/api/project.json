@@ -1,5 +1,5 @@
 {
-    "schema_url": "http://localhost/lok/graphql",
+    "schema_url": "https://go.arkitekt.live/lok/schema",
     "documents": "graphql/unlok-next/*/**.graphql",
     "extensions": {
         "turms": {

@@ -13,7 +13,6 @@ from arkitekt_next.service_registry import (
     Params,
     get_default_service_registry,
 )
-from fakts_next.models import Requirement
 import os
 
 
@@ -32,10 +31,10 @@ class UnlokService(BaseArkitektService):
                     auth=FaktsAuthLink(fakts=fakts),
                     split=SplitLink(
                         left=FaktsAIOHttpLink(
-                            fakts_group="unlok", fakts=fakts, endpoint_url="FAKE_URL"
+                            fakts_group="self", fakts=fakts, endpoint_url="FAKE_URL"
                         ),
                         right=FaktsGraphQLWSLink(
-                            fakts_group="unlok", fakts=fakts, ws_endpoint_url="FAKE_URL"
+                            fakts_group="self", fakts=fakts, ws_endpoint_url="FAKE_URL"
                         ),
                         split=lambda o: o.node.operation != OperationType.SUBSCRIPTION,
                     ),
@@ -44,13 +43,7 @@ class UnlokService(BaseArkitektService):
         )
 
     def get_requirements(self):
-        return [
-            Requirement(
-                key="unlok",
-                service="live.arkitekt.lok",
-                description="An instance of ArkitektNext Lok to authenticate the user",
-            ),
-        ]
+        return []
 
     def get_graphql_schema(self):
         schema_graphql_path = build_relative_path("api", "schema.graphql")

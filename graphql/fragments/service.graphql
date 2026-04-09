@@ -2,13 +2,10 @@ fragment ListService on Service {
   identifier
   id
   name
-  logo {
-    presignedUrl
+  releases {
+    ...ListServiceRelease
   }
-  description
-  instances {
-    ...ListServiceInstance
-  }
+  
 }
 
 fragment Service on Service {
@@ -19,7 +16,4 @@ fragment Service on Service {
     presignedUrl
   }
   description
-  instances {
-    ...ListServiceInstance
-  }
 }
