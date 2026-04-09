@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.3.1 (2026-04-09)
+
+### Bug Fixes
+
+- New api
+  ([`7f8a224`](https://github.com/arkitektio/unlok-next/commit/7f8a2241550ab86c7f6ba8e86afcecf1db657de7))
+
+
 ## v1.3.0 (2025-11-14)
 
 ### Features
