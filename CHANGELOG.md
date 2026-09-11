@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.3.2 (2026-09-11)
+
+### Bug Fixes
+
+- With pytyped
+  ([`c460855`](https://github.com/arkitektio/unlok-next/commit/c460855b5cfb0d2feb708ae78ec87b9a783bb4ae))
+
+
 ## v1.3.1 (2026-04-09)
 
 ### Bug Fixes
