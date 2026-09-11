@@ -2,6 +2,17 @@
 
 <!-- version list -->
 
+## v1.3.3 (2026-09-11)
+
+### Bug Fixes
+
+- Import the renamed arkitekt service registry
+  ([`17b6427`](https://github.com/arkitektio/unlok-next/commit/17b6427d82e7f67db9af85ef25826c238a16dcc4))
+
+- Move onto the renamed arkitekt packages
+  ([`0184320`](https://github.com/arkitektio/unlok-next/commit/01843206ee0e5d60a3ddc4523694b9f559ee4ab4))
+
+
 ## v1.3.2 (2026-09-11)
 
 ### Bug Fixes
