@@ -2,7 +2,7 @@ services:
   redis:
     image: redis:latest
   db:
-    image: jhnnsrs/daten:dev
+    image: jhnnsrs/daten:next
     restart: always
     environment:
       POSTGRES_MULTIPLE_DATABASES: lok
@@ -12,7 +12,7 @@ services:
     depends_on:
     - redis
     - db
-    - minio
+    - rustfs
     - initc
     image: jhnnsrs/lok:${LOK_SERVICE_TAG:-next}
     command: bash run-debug.sh
@@ -32,22 +32,23 @@ services:
       AUTHENTIKATE__ISSUERS: '[{"kind": "rsa", "iss": "http://localhost:${LOK_HOST_PORT:-6888}", "kid": "lok-key-1", "public_key": "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCvSUtg4u9vuwFs4XXx8yeQ17VjhndNNky08WlFfgjPbrP3hrZzWK8dphE7ogtH1zzLMFIjsw8vQLUeDoJSfYi4MXzcU4F23ojBXrq71CT1esoz23WvPnObIldqBlE6FoTb2OotVX5QjJhVqdHLwGdCClwkBRH4kFjuv3tjzdSUwzHI9M/WK6OMuyaLru2QIT2b+fqLKuARNBl8u4iLJQsioM+OyvKW4DoQK1zA0IM4OW7l0JsRkAV5hgjHepn8wsb9u5ShipGkAj6JEtRtPAm9ZmrqduYhRnejevaXY5tdWlh+dXVNhwegV5CdcqiFkjaCzFa13gjpHoFsFhHs9pkl"}]'
     volumes:
     - ./configs/lok.yaml:/workspace/config.yaml
-  minio:
-    command: server /data
+  rustfs:
     environment:
-      MINIO_ROOT_PASSWORD: minio_root_password
-      MINIO_ROOT_USER: minio_root_user
-    image: minio/minio:RELEASE.2025-02-18T16-25-55Z
+      RUSTFS_VOLUMES: /data
+      RUSTFS_ADDRESS: ":9000"
+      RUSTFS_SECRET_KEY: minio_root_password
+      RUSTFS_ACCESS_KEY: minio_root_user
+    image: rustfs/rustfs:latest
     ports:
-    - "${MINIO_HOST_PORT:-6889}:9000"
+    - "${RUSTFS_HOST_PORT:-6889}:9000"
   initc:
     depends_on:
-      minio:
+      rustfs:
         condition: service_started
     environment:
-      MINIO_HOST: http://minio:9000
-      MINIO_ROOT_PASSWORD: minio_root_password
-      MINIO_ROOT_USER: minio_root_user
-    image: jhnnsrs/init:dev
+      RUSTFS_HOST: http://rustfs:9000
+      RUSTFS_SECRET_KEY: minio_root_password
+      RUSTFS_ACCESS_KEY: minio_root_user
+    image: jhnnsrs/init:next
     volumes:
-    - ./configs/minio.yaml:/workspace/config.yaml
+    - ./configs/rustfs.yaml:/workspace/config.yaml
