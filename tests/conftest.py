@@ -103,12 +103,12 @@ def integration_ports() -> Generator[dict[str, int], None, None]:
     an unpublished port reads back as ``None`` and the test URLs would quietly
     become ``http://localhost:None`` instead of failing loudly.
     """
-    lok_port, minio_port = _reserve_free_ports(2)
-    env = {"LOK_HOST_PORT": str(lok_port), "MINIO_HOST_PORT": str(minio_port)}
+    lok_port, rustfs_port = _reserve_free_ports(2)
+    env = {"LOK_HOST_PORT": str(lok_port), "RUSTFS_HOST_PORT": str(rustfs_port)}
     previous = {key: os.environ.get(key) for key in env}
     os.environ.update(env)
     try:
-        yield {"lok": lok_port, "minio": minio_port}
+        yield {"lok": lok_port, "rustfs": rustfs_port}
     finally:
         for key, value in previous.items():
             if value is None:
