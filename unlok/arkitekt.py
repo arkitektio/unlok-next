@@ -1,7 +1,7 @@
 import json
 from fakts.contrib.rath.auth import FaktsAuthLink
-from unlok_next.unlok import Unlok
-from unlok_next.rath import UnlokLinkComposition, UnlokRath
+from unlok.unlok import Unlok
+from unlok.rath import UnlokLinkComposition, UnlokRath
 from rath.links.split import SplitLink
 from fakts.contrib.rath.aiohttp import FaktsAIOHttpLink
 from fakts.contrib.rath.graphql_ws import FaktsGraphQLWSLink

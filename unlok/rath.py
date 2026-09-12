@@ -10,8 +10,8 @@ from rath.links.dictinglink import DictingLink
 from rath.links.shrink import ShrinkingLink
 from rath.links.split import SplitLink
 
-current_unlok_next_rath: contextvars.ContextVar[Optional["UnlokRath"]] = (
-    contextvars.ContextVar("current_unlok_next_rath")
+current_unlok_rath: contextvars.ContextVar[Optional["UnlokRath"]] = (
+    contextvars.ContextVar("current_unlok_rath")
 )
 
 
@@ -31,7 +31,7 @@ class UnlokRath(rath.Rath):
 
     async def __aenter__(self):
         await super().__aenter__()
-        current_unlok_next_rath.set(self)
+        current_unlok_rath.set(self)
         return self
 
     async def __aexit__(
@@ -41,4 +41,4 @@ class UnlokRath(rath.Rath):
         exc_tb: TracebackType | None,
     ) -> None:
         await super().__aexit__(exc_type, exc_val, exc_tb)
-        current_unlok_next_rath.set(None)
+        current_unlok_rath.set(None)

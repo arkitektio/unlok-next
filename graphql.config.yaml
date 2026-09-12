@@ -4,7 +4,7 @@ projects:
     documents: graphql/*/**.graphql
     extensions:
       turms:
-        out_dir: unlok_next/api
+        out_dir: unlok/api
         exclude_typenames: true
         dump_configuration: true
         dump_schema: true
@@ -33,7 +33,7 @@ projects:
             expand_input_types:
               - input
             global_kwargs:
-              - type: unlok_next.rath.UnlokRath
+              - type: unlok.rath.UnlokRath
                 key: rath
                 description:
                   The client we want to use (defaults to the currently active
@@ -41,19 +41,19 @@ projects:
             definitions:
               - type: subscription
                 is_async: true
-                use: unlok_next.funcs.asubscribe
+                use: unlok.funcs.asubscribe
               - type: query
                 is_async: true
-                use: unlok_next.funcs.aexecute
+                use: unlok.funcs.aexecute
               - type: mutation
                 is_async: true
-                use: unlok_next.funcs.aexecute
+                use: unlok.funcs.aexecute
               - type: subscription
-                use: unlok_next.funcs.subscribe
+                use: unlok.funcs.subscribe
               - type: query
-                use: unlok_next.funcs.execute
+                use: unlok.funcs.execute
               - type: mutation
-                use: unlok_next.funcs.execute
+                use: unlok.funcs.execute
         processors:
           - type: turms.processors.black.BlackProcessor
         scalar_definitions:
@@ -66,3 +66,4 @@ projects:
           UnsafeChild: typing.Any
           ServiceIdentifier: str
           Identifier: str
+          JSON: typing.Any

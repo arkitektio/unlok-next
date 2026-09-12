@@ -1,21 +1,40 @@
-from typing import (
-    Iterable,
-    Any,
-    List,
-    Optional,
-    Tuple,
-    Literal,
-    Annotated,
-    Union,
-    AsyncIterator,
-    Iterator,
-)
-from unlok_next.funcs import execute, subscribe, aexecute, asubscribe
-from rath.scalars import IDCoercible, ID
 from datetime import datetime
 from enum import Enum
-from unlok_next.rath import UnlokRath
-from pydantic import ConfigDict, BaseModel, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field
+from rath.scalars import ID, IDCoercible
+from typing import Annotated, Any, AsyncIterator, Iterable, Iterator, Literal
+from unlok.funcs import aexecute, asubscribe, execute, subscribe
+from unlok.rath import UnlokRath
+
+
+class GraphQLDefault:
+    """Records a GraphQL field schema default value. The client omits the field so the server applies its own default; this preserves the value for introspection."""
+
+    def __init__(self, value):
+        self.value = value
+
+    def __repr__(self):
+        return "GraphQLDefault(" + repr(self.value) + ")"
+
+
+class UnsetType:
+    """Sentinel for arguments the caller did not provide. Such fields are omitted on serialization so the GraphQL server applies its own default."""
+
+    _instance = None
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
+
+    def __repr__(self):
+        return "UNSET"
+
+    def __bool__(self):
+        return False
+
+
+UNSET = UnsetType()
 
 
 class ClientKind(str, Enum):
@@ -24,6 +43,18 @@ class ClientKind(str, Enum):
     DEVELOPMENT = "DEVELOPMENT"
     WEBSITE = "WEBSITE"
     DESKTOP = "DESKTOP"
+    MOBILE = "MOBILE"
+    HUB = "HUB"
+    RELYING_PARTY = "RELYING_PARTY"
+    __str__ = str.__str__
+
+
+class ClientRole(str, Enum):
+    """No documentation"""
+
+    INTERFACE = "INTERFACE"
+    AGENT = "AGENT"
+    __str__ = str.__str__
 
 
 class DescendantKind(str, Enum):
@@ -32,6 +63,7 @@ class DescendantKind(str, Enum):
     LEAF = "LEAF"
     MENTION = "MENTION"
     PARAGRAPH = "PARAGRAPH"
+    __str__ = str.__str__
 
 
 class PublicSourceKind(str, Enum):
@@ -39,31 +71,80 @@ class PublicSourceKind(str, Enum):
 
     GITHUB = "GITHUB"
     WEBSITE = "WEBSITE"
+    __str__ = str.__str__
 
 
 class AppFilter(BaseModel):
-    """App(id, name, identifier, logo)"""
+    """App(id, name, identifier, organization, logo)"""
 
-    search: Optional[str] = None
-    ids: Optional[Tuple[ID, ...]] = None
-    and_: Optional["AppFilter"] = Field(alias="AND", default=None)
-    or_: Optional["AppFilter"] = Field(alias="OR", default=None)
-    not_: Optional["AppFilter"] = Field(alias="NOT", default=None)
-    distinct: Optional[bool] = Field(alias="DISTINCT", default=None)
+    and_: "AppFilter | None" = Field(
+        validation_alias=AliasChoices("and_", "AND"),
+        serialization_alias="AND",
+        default=None,
+    )
+    or_: "AppFilter | None" = Field(
+        validation_alias=AliasChoices("or_", "OR"),
+        serialization_alias="OR",
+        default=None,
+    )
+    not_: "AppFilter | None" = Field(
+        validation_alias=AliasChoices("not_", "NOT"),
+        serialization_alias="NOT",
+        default=None,
+    )
+    distinct: bool | None = Field(
+        validation_alias=AliasChoices("distinct", "DISTINCT"),
+        serialization_alias="DISTINCT",
+        default=None,
+    )
+    ids: tuple[ID, ...] | None = None
+    search: str | None = None
     model_config = ConfigDict(
         frozen=True, extra="forbid", populate_by_name=True, use_enum_values=True
     )
 
 
 class ClientFilter(BaseModel):
-    """Client(id, composition, functional, name, release, oauth2_client, kind, user, organization, membership, redirect_uris, public, token, node, public_sources, tenant, created_at, requirements_hash, logo, last_reported_at, manifest)"""
+    """The one client model: every OAuth2 principal is a row here.
 
-    search: Optional[str] = None
-    ids: Optional[Tuple[ID, ...]] = None
-    and_: Optional["ClientFilter"] = Field(alias="AND", default=None)
-    or_: Optional["ClientFilter"] = Field(alias="OR", default=None)
-    not_: Optional["ClientFilter"] = Field(alias="NOT", default=None)
-    distinct: Optional[bool] = Field(alias="DISTINCT", default=None)
+    Kinds of rows and their lifecycle:
+
+    - **App clients** (`development`/`website`/`desktop`/`mobile`): the row is created by
+      dynamic registration at ``/o/app-authorization/`` with identity fields
+      only; human approval *binds* it (membership, organization, release, hub,
+      mappings, scope). ``membership`` null == not yet approved.
+    - **Hub identities** (`hub`): same lifecycle via ``/o/hub-authorization/``;
+      the created ``Hub`` links back via ``Hub.client`` (reverse:
+      ``client.hub_identity``).
+    - **Relying parties** (`relying_party`): confidential OIDC clients
+      provisioned from config by ``ensureopenid``; global (no organization).
+
+    Implements authlib's ``ClientMixin`` directly — there is no separate
+    OAuth2 client table anymore."""
+
+    and_: "ClientFilter | None" = Field(
+        validation_alias=AliasChoices("and_", "AND"),
+        serialization_alias="AND",
+        default=None,
+    )
+    or_: "ClientFilter | None" = Field(
+        validation_alias=AliasChoices("or_", "OR"),
+        serialization_alias="OR",
+        default=None,
+    )
+    not_: "ClientFilter | None" = Field(
+        validation_alias=AliasChoices("not_", "NOT"),
+        serialization_alias="NOT",
+        default=None,
+    )
+    distinct: bool | None = Field(
+        validation_alias=AliasChoices("distinct", "DISTINCT"),
+        serialization_alias="DISTINCT",
+        default=None,
+    )
+    ids: tuple[ID, ...] | None = None
+    search: str | None = None
+    role: ClientRole | None = None
     model_config = ConfigDict(
         frozen=True, extra="forbid", populate_by_name=True, use_enum_values=True
     )
@@ -95,12 +176,26 @@ class CreateServiceInstanceInput(BaseModel):
 
     identifier: str
     service: ID
-    allowed_users: Optional[Tuple[ID, ...]] = Field(alias="allowedUsers", default=None)
-    allowed_groups: Optional[Tuple[ID, ...]] = Field(
-        alias="allowedGroups", default=None
+    allowed_users: tuple[ID, ...] | None = Field(
+        validation_alias=AliasChoices("allowed_users", "allowedUsers"),
+        serialization_alias="allowedUsers",
+        default=None,
     )
-    denied_groups: Optional[Tuple[ID, ...]] = Field(alias="deniedGroups", default=None)
-    denied_users: Optional[Tuple[ID, ...]] = Field(alias="deniedUsers", default=None)
+    allowed_groups: tuple[ID, ...] | None = Field(
+        validation_alias=AliasChoices("allowed_groups", "allowedGroups"),
+        serialization_alias="allowedGroups",
+        default=None,
+    )
+    denied_groups: tuple[ID, ...] | None = Field(
+        validation_alias=AliasChoices("denied_groups", "deniedGroups"),
+        serialization_alias="deniedGroups",
+        default=None,
+    )
+    denied_users: tuple[ID, ...] | None = Field(
+        validation_alias=AliasChoices("denied_users", "deniedUsers"),
+        serialization_alias="deniedUsers",
+        default=None,
+    )
     model_config = ConfigDict(
         frozen=True, extra="forbid", populate_by_name=True, use_enum_values=True
     )
@@ -110,12 +205,12 @@ class DescendantInput(BaseModel):
     """No documentation"""
 
     kind: DescendantKind
-    children: Optional[Tuple["DescendantInput", ...]] = None
-    user: Optional[str] = None
-    bold: Optional[bool] = None
-    italic: Optional[bool] = None
-    code: Optional[bool] = None
-    text: Optional[str] = None
+    children: tuple["DescendantInput", ...] | None = None
+    user: str | None = None
+    bold: bool | None = None
+    italic: bool | None = None
+    code: bool | None = None
+    text: str | None = None
     model_config = ConfigDict(
         frozen=True, extra="forbid", populate_by_name=True, use_enum_values=True
     )
@@ -125,8 +220,10 @@ class DevelopmentClientInput(BaseModel):
     """No documentation"""
 
     manifest: "ManifestInput"
-    composition: Optional[ID] = None
-    layers: Optional[Tuple[str, ...]] = None
+    hub: ID | None = None
+    layers: Annotated[tuple[str, ...] | None, GraphQLDefault("['web']")] = None
+    "Default: ['web']"
+    role: ClientRole | None = None
     model_config = ConfigDict(
         frozen=True, extra="forbid", populate_by_name=True, use_enum_values=True
     )
@@ -135,13 +232,29 @@ class DevelopmentClientInput(BaseModel):
 class GroupFilter(BaseModel):
     """__doc__"""
 
-    search: Optional[str] = None
-    name: Optional["StrFilterLookup"] = None
-    ids: Optional[Tuple[ID, ...]] = None
-    and_: Optional["GroupFilter"] = Field(alias="AND", default=None)
-    or_: Optional["GroupFilter"] = Field(alias="OR", default=None)
-    not_: Optional["GroupFilter"] = Field(alias="NOT", default=None)
-    distinct: Optional[bool] = Field(alias="DISTINCT", default=None)
+    name: "StrFilterLookup | None" = None
+    and_: "GroupFilter | None" = Field(
+        validation_alias=AliasChoices("and_", "AND"),
+        serialization_alias="AND",
+        default=None,
+    )
+    or_: "GroupFilter | None" = Field(
+        validation_alias=AliasChoices("or_", "OR"),
+        serialization_alias="OR",
+        default=None,
+    )
+    not_: "GroupFilter | None" = Field(
+        validation_alias=AliasChoices("not_", "NOT"),
+        serialization_alias="NOT",
+        default=None,
+    )
+    distinct: bool | None = Field(
+        validation_alias=AliasChoices("distinct", "DISTINCT"),
+        serialization_alias="DISTINCT",
+        default=None,
+    )
+    ids: tuple[ID, ...] | None = None
+    search: str | None = None
     model_config = ConfigDict(
         frozen=True, extra="forbid", populate_by_name=True, use_enum_values=True
     )
@@ -150,12 +263,28 @@ class GroupFilter(BaseModel):
 class LayerFilter(BaseModel):
     """Layer(id, name, identifier, organization, logo, description, dns_probe, get_probe, kind)"""
 
-    search: Optional[str] = None
-    ids: Optional[Tuple[ID, ...]] = None
-    and_: Optional["LayerFilter"] = Field(alias="AND", default=None)
-    or_: Optional["LayerFilter"] = Field(alias="OR", default=None)
-    not_: Optional["LayerFilter"] = Field(alias="NOT", default=None)
-    distinct: Optional[bool] = Field(alias="DISTINCT", default=None)
+    and_: "LayerFilter | None" = Field(
+        validation_alias=AliasChoices("and_", "AND"),
+        serialization_alias="AND",
+        default=None,
+    )
+    or_: "LayerFilter | None" = Field(
+        validation_alias=AliasChoices("or_", "OR"),
+        serialization_alias="OR",
+        default=None,
+    )
+    not_: "LayerFilter | None" = Field(
+        validation_alias=AliasChoices("not_", "NOT"),
+        serialization_alias="NOT",
+        default=None,
+    )
+    distinct: bool | None = Field(
+        validation_alias=AliasChoices("distinct", "DISTINCT"),
+        serialization_alias="DISTINCT",
+        default=None,
+    )
+    ids: tuple[ID, ...] | None = None
+    search: str | None = None
     model_config = ConfigDict(
         frozen=True, extra="forbid", populate_by_name=True, use_enum_values=True
     )
@@ -166,12 +295,35 @@ class ManifestInput(BaseModel):
 
     identifier: str
     version: str
-    logo: Optional[str] = None
-    scopes: Tuple[str, ...]
-    requirements: Tuple["RequirementInput", ...]
-    node_id: Optional[str] = Field(alias="nodeId", default=None)
-    public_sources: Optional[Tuple["PublicSourceInput", ...]] = Field(
-        alias="publicSources", default=None
+    title: str | None = None
+    description: str | None = None
+    logo: str | None = None
+    scopes: Annotated[tuple[str, ...] | None, GraphQLDefault("[]")] = None
+    "Default: []"
+    requirements: Annotated[
+        tuple["RequirementInput", ...] | None, GraphQLDefault("[]")
+    ] = None
+    "Default: []"
+    node_id: str | None = Field(
+        validation_alias=AliasChoices("node_id", "nodeId"),
+        serialization_alias="nodeId",
+        default=None,
+    )
+    authors: Annotated[tuple[str, ...] | None, GraphQLDefault("[]")] = None
+    "Default: []"
+    keywords: Annotated[tuple[str, ...] | None, GraphQLDefault("[]")] = None
+    "Default: []"
+    license: str | None = None
+    homepage: str | None = None
+    repo_url: str | None = Field(
+        validation_alias=AliasChoices("repo_url", "repoUrl"),
+        serialization_alias="repoUrl",
+        default=None,
+    )
+    public_sources: tuple["PublicSourceInput", ...] | None = Field(
+        validation_alias=AliasChoices("public_sources", "publicSources"),
+        serialization_alias="publicSources",
+        default=None,
     )
     model_config = ConfigDict(
         frozen=True, extra="forbid", populate_by_name=True, use_enum_values=True
@@ -181,8 +333,9 @@ class ManifestInput(BaseModel):
 class OffsetPaginationInput(BaseModel):
     """No documentation"""
 
-    offset: int
-    limit: Optional[int] = None
+    offset: Annotated[int | None, GraphQLDefault("0")] = None
+    "Default: 0"
+    limit: int | None = None
     model_config = ConfigDict(
         frozen=True, extra="forbid", populate_by_name=True, use_enum_values=True
     )
@@ -206,12 +359,48 @@ class RedeemTokenFilter(BaseModel):
     If the token has been redeemed, but the manifest has changed, the token will be invalid.
     """
 
-    search: Optional[str] = None
-    ids: Optional[Tuple[ID, ...]] = None
-    and_: Optional["RedeemTokenFilter"] = Field(alias="AND", default=None)
-    or_: Optional["RedeemTokenFilter"] = Field(alias="OR", default=None)
-    not_: Optional["RedeemTokenFilter"] = Field(alias="NOT", default=None)
-    distinct: Optional[bool] = Field(alias="DISTINCT", default=None)
+    and_: "RedeemTokenFilter | None" = Field(
+        validation_alias=AliasChoices("and_", "AND"),
+        serialization_alias="AND",
+        default=None,
+    )
+    or_: "RedeemTokenFilter | None" = Field(
+        validation_alias=AliasChoices("or_", "OR"),
+        serialization_alias="OR",
+        default=None,
+    )
+    not_: "RedeemTokenFilter | None" = Field(
+        validation_alias=AliasChoices("not_", "NOT"),
+        serialization_alias="NOT",
+        default=None,
+    )
+    distinct: bool | None = Field(
+        validation_alias=AliasChoices("distinct", "DISTINCT"),
+        serialization_alias="DISTINCT",
+        default=None,
+    )
+    ids: tuple[ID, ...] | None = None
+    search: str | None = None
+    model_config = ConfigDict(
+        frozen=True, extra="forbid", populate_by_name=True, use_enum_values=True
+    )
+
+
+class RedeemTokenInput(BaseModel):
+    """No documentation"""
+
+    manifest: ManifestInput
+    token: str | None = None
+    expires_in_days: int | None = Field(
+        validation_alias=AliasChoices("expires_in_days", "expiresInDays"),
+        serialization_alias="expiresInDays",
+        default=None,
+    )
+    max_redemptions: int | None = Field(
+        validation_alias=AliasChoices("max_redemptions", "maxRedemptions"),
+        serialization_alias="maxRedemptions",
+        default=None,
+    )
     model_config = ConfigDict(
         frozen=True, extra="forbid", populate_by_name=True, use_enum_values=True
     )
@@ -221,8 +410,9 @@ class RequirementInput(BaseModel):
     """No documentation"""
 
     service: str
-    optional: bool
-    description: Optional[str] = None
+    optional: Annotated[bool | None, GraphQLDefault("False")] = None
+    "Default: False"
+    description: str | None = None
     key: str
     model_config = ConfigDict(
         frozen=True, extra="forbid", populate_by_name=True, use_enum_values=True
@@ -230,28 +420,60 @@ class RequirementInput(BaseModel):
 
 
 class ServiceFilter(BaseModel):
-    """Service(id, name, identifier, logo, description)"""
+    """Service(id, name, identifier, organization, logo, description)"""
 
-    search: Optional[str] = None
-    ids: Optional[Tuple[ID, ...]] = None
-    and_: Optional["ServiceFilter"] = Field(alias="AND", default=None)
-    or_: Optional["ServiceFilter"] = Field(alias="OR", default=None)
-    not_: Optional["ServiceFilter"] = Field(alias="NOT", default=None)
-    distinct: Optional[bool] = Field(alias="DISTINCT", default=None)
+    and_: "ServiceFilter | None" = Field(
+        validation_alias=AliasChoices("and_", "AND"),
+        serialization_alias="AND",
+        default=None,
+    )
+    or_: "ServiceFilter | None" = Field(
+        validation_alias=AliasChoices("or_", "OR"),
+        serialization_alias="OR",
+        default=None,
+    )
+    not_: "ServiceFilter | None" = Field(
+        validation_alias=AliasChoices("not_", "NOT"),
+        serialization_alias="NOT",
+        default=None,
+    )
+    distinct: bool | None = Field(
+        validation_alias=AliasChoices("distinct", "DISTINCT"),
+        serialization_alias="DISTINCT",
+        default=None,
+    )
+    ids: tuple[ID, ...] | None = None
+    search: str | None = None
     model_config = ConfigDict(
         frozen=True, extra="forbid", populate_by_name=True, use_enum_values=True
     )
 
 
 class ServiceInstanceFilter(BaseModel):
-    """ServiceInstance(id, composition, release, logo, instance_id, private_key, steward, organization, device, template, public_key, token)"""
+    """ServiceInstance(id, hub, release, logo, instance_id, private_key, steward, organization, device, template, public_key, token)"""
 
-    search: Optional[str] = None
-    ids: Optional[Tuple[ID, ...]] = None
-    and_: Optional["ServiceInstanceFilter"] = Field(alias="AND", default=None)
-    or_: Optional["ServiceInstanceFilter"] = Field(alias="OR", default=None)
-    not_: Optional["ServiceInstanceFilter"] = Field(alias="NOT", default=None)
-    distinct: Optional[bool] = Field(alias="DISTINCT", default=None)
+    and_: "ServiceInstanceFilter | None" = Field(
+        validation_alias=AliasChoices("and_", "AND"),
+        serialization_alias="AND",
+        default=None,
+    )
+    or_: "ServiceInstanceFilter | None" = Field(
+        validation_alias=AliasChoices("or_", "OR"),
+        serialization_alias="OR",
+        default=None,
+    )
+    not_: "ServiceInstanceFilter | None" = Field(
+        validation_alias=AliasChoices("not_", "NOT"),
+        serialization_alias="NOT",
+        default=None,
+    )
+    distinct: bool | None = Field(
+        validation_alias=AliasChoices("distinct", "DISTINCT"),
+        serialization_alias="DISTINCT",
+        default=None,
+    )
+    ids: tuple[ID, ...] | None = None
+    search: str | None = None
     model_config = ConfigDict(
         frozen=True, extra="forbid", populate_by_name=True, use_enum_values=True
     )
@@ -260,12 +482,28 @@ class ServiceInstanceFilter(BaseModel):
 class ServiceReleaseFilter(BaseModel):
     """ServiceRelease(id, service, version)"""
 
-    search: Optional[str] = None
-    ids: Optional[Tuple[ID, ...]] = None
-    and_: Optional["ServiceReleaseFilter"] = Field(alias="AND", default=None)
-    or_: Optional["ServiceReleaseFilter"] = Field(alias="OR", default=None)
-    not_: Optional["ServiceReleaseFilter"] = Field(alias="NOT", default=None)
-    distinct: Optional[bool] = Field(alias="DISTINCT", default=None)
+    and_: "ServiceReleaseFilter | None" = Field(
+        validation_alias=AliasChoices("and_", "AND"),
+        serialization_alias="AND",
+        default=None,
+    )
+    or_: "ServiceReleaseFilter | None" = Field(
+        validation_alias=AliasChoices("or_", "OR"),
+        serialization_alias="OR",
+        default=None,
+    )
+    not_: "ServiceReleaseFilter | None" = Field(
+        validation_alias=AliasChoices("not_", "NOT"),
+        serialization_alias="NOT",
+        default=None,
+    )
+    distinct: bool | None = Field(
+        validation_alias=AliasChoices("distinct", "DISTINCT"),
+        serialization_alias="DISTINCT",
+        default=None,
+    )
+    ids: tuple[ID, ...] | None = None
+    search: str | None = None
     model_config = ConfigDict(
         frozen=True, extra="forbid", populate_by_name=True, use_enum_values=True
     )
@@ -275,7 +513,7 @@ class StashItemInput(BaseModel):
     """No documentation"""
 
     identifier: str
-    description: Optional[str] = None
+    description: str | None = None
     object: str
     model_config = ConfigDict(
         frozen=True, extra="forbid", populate_by_name=True, use_enum_values=True
@@ -285,23 +523,59 @@ class StashItemInput(BaseModel):
 class StrFilterLookup(BaseModel):
     """No documentation"""
 
-    exact: Optional[str] = None
-    i_exact: Optional[str] = Field(alias="iExact", default=None)
-    contains: Optional[str] = None
-    i_contains: Optional[str] = Field(alias="iContains", default=None)
-    in_list: Optional[Tuple[str, ...]] = Field(alias="inList", default=None)
-    gt: Optional[str] = None
-    gte: Optional[str] = None
-    lt: Optional[str] = None
-    lte: Optional[str] = None
-    starts_with: Optional[str] = Field(alias="startsWith", default=None)
-    i_starts_with: Optional[str] = Field(alias="iStartsWith", default=None)
-    ends_with: Optional[str] = Field(alias="endsWith", default=None)
-    i_ends_with: Optional[str] = Field(alias="iEndsWith", default=None)
-    range: Optional[Tuple[str, ...]] = None
-    is_null: Optional[bool] = Field(alias="isNull", default=None)
-    regex: Optional[str] = None
-    i_regex: Optional[str] = Field(alias="iRegex", default=None)
+    exact: str | None = None
+    i_exact: str | None = Field(
+        validation_alias=AliasChoices("i_exact", "iExact"),
+        serialization_alias="iExact",
+        default=None,
+    )
+    contains: str | None = None
+    i_contains: str | None = Field(
+        validation_alias=AliasChoices("i_contains", "iContains"),
+        serialization_alias="iContains",
+        default=None,
+    )
+    in_list: tuple[str, ...] | None = Field(
+        validation_alias=AliasChoices("in_list", "inList"),
+        serialization_alias="inList",
+        default=None,
+    )
+    gt: str | None = None
+    gte: str | None = None
+    lt: str | None = None
+    lte: str | None = None
+    starts_with: str | None = Field(
+        validation_alias=AliasChoices("starts_with", "startsWith"),
+        serialization_alias="startsWith",
+        default=None,
+    )
+    i_starts_with: str | None = Field(
+        validation_alias=AliasChoices("i_starts_with", "iStartsWith"),
+        serialization_alias="iStartsWith",
+        default=None,
+    )
+    ends_with: str | None = Field(
+        validation_alias=AliasChoices("ends_with", "endsWith"),
+        serialization_alias="endsWith",
+        default=None,
+    )
+    i_ends_with: str | None = Field(
+        validation_alias=AliasChoices("i_ends_with", "iEndsWith"),
+        serialization_alias="iEndsWith",
+        default=None,
+    )
+    range: tuple[str, ...] | None = None
+    is_null: bool | None = Field(
+        validation_alias=AliasChoices("is_null", "isNull"),
+        serialization_alias="isNull",
+        default=None,
+    )
+    regex: str | None = None
+    i_regex: str | None = Field(
+        validation_alias=AliasChoices("i_regex", "iRegex"),
+        serialization_alias="iRegex",
+        default=None,
+    )
     model_config = ConfigDict(
         frozen=True, extra="forbid", populate_by_name=True, use_enum_values=True
     )
@@ -332,12 +606,26 @@ class UpdateProfileInput(BaseModel):
 class UpdateServiceInstanceInput(BaseModel):
     """No documentation"""
 
-    allowed_users: Optional[Tuple[ID, ...]] = Field(alias="allowedUsers", default=None)
-    allowed_groups: Optional[Tuple[ID, ...]] = Field(
-        alias="allowedGroups", default=None
+    allowed_users: tuple[ID, ...] | None = Field(
+        validation_alias=AliasChoices("allowed_users", "allowedUsers"),
+        serialization_alias="allowedUsers",
+        default=None,
     )
-    denied_groups: Optional[Tuple[ID, ...]] = Field(alias="deniedGroups", default=None)
-    denied_users: Optional[Tuple[ID, ...]] = Field(alias="deniedUsers", default=None)
+    allowed_groups: tuple[ID, ...] | None = Field(
+        validation_alias=AliasChoices("allowed_groups", "allowedGroups"),
+        serialization_alias="allowedGroups",
+        default=None,
+    )
+    denied_groups: tuple[ID, ...] | None = Field(
+        validation_alias=AliasChoices("denied_groups", "deniedGroups"),
+        serialization_alias="deniedGroups",
+        default=None,
+    )
+    denied_users: tuple[ID, ...] | None = Field(
+        validation_alias=AliasChoices("denied_users", "deniedUsers"),
+        serialization_alias="deniedUsers",
+        default=None,
+    )
     id: ID
     model_config = ConfigDict(
         frozen=True, extra="forbid", populate_by_name=True, use_enum_values=True
@@ -351,14 +639,32 @@ class UserFilter(BaseModel):
     Each user is identifier by a unique username, and can have an email address associated with them.
     """
 
-    search: Optional[str] = None
-    username: Optional[StrFilterLookup] = None
-    "Required. 150 characters or fewer. Letters, digits and @/./+/-/_ only."
-    ids: Optional[Tuple[ID, ...]] = None
-    and_: Optional["UserFilter"] = Field(alias="AND", default=None)
-    or_: Optional["UserFilter"] = Field(alias="OR", default=None)
-    not_: Optional["UserFilter"] = Field(alias="NOT", default=None)
-    distinct: Optional[bool] = Field(alias="DISTINCT", default=None)
+    username: StrFilterLookup | None = Field(
+        default=None,
+        description="Required. 150 characters or fewer. Letters, digits and @/./+/-/_ only.",
+    )
+    and_: "UserFilter | None" = Field(
+        validation_alias=AliasChoices("and_", "AND"),
+        serialization_alias="AND",
+        default=None,
+    )
+    or_: "UserFilter | None" = Field(
+        validation_alias=AliasChoices("or_", "OR"),
+        serialization_alias="OR",
+        default=None,
+    )
+    not_: "UserFilter | None" = Field(
+        validation_alias=AliasChoices("not_", "NOT"),
+        serialization_alias="NOT",
+        default=None,
+    )
+    distinct: bool | None = Field(
+        validation_alias=AliasChoices("distinct", "DISTINCT"),
+        serialization_alias="DISTINCT",
+        default=None,
+    )
+    ids: tuple[ID, ...] | None = None
+    search: str | None = None
     model_config = ConfigDict(
         frozen=True, extra="forbid", populate_by_name=True, use_enum_values=True
     )
@@ -384,7 +690,7 @@ class ListApp(BaseModel):
     id: ID
     identifier: str
     "The identifier of the app. This should be a globally unique string that identifies the app. We encourage you to use the reverse domain name notation. E.g. `com.example.myapp`"
-    logo: Optional[ListAppLogo] = Field(default=None)
+    logo: ListAppLogo | None = Field(default=None)
     "The logo of the app. This should be a url to a logo that can be used to represent the app."
     model_config = ConfigDict(frozen=True)
 
@@ -449,7 +755,7 @@ class ListClientReleaseApp(BaseModel):
     id: ID
     identifier: str
     "The identifier of the app. This should be a globally unique string that identifies the app. We encourage you to use the reverse domain name notation. E.g. `com.example.myapp`"
-    logo: Optional[ListClientReleaseAppLogo] = Field(default=None)
+    logo: ListClientReleaseAppLogo | None = Field(default=None)
     "The logo of the app. This should be a url to a logo that can be used to represent the app."
     model_config = ConfigDict(frozen=True)
 
@@ -462,7 +768,7 @@ class ListClientRelease(BaseModel):
     )
     version: str
     "The version of the release. This should be a string that identifies the version of the release. We enforce semantic versioning notation. E.g. `0.1.0`. The version is unique per app."
-    logo: Optional[ListClientReleaseLogo] = Field(default=None)
+    logo: ListClientReleaseLogo | None = Field(default=None)
     "The logo of the release. This should be a url to a logo that can be used to represent the release."
     app: ListClientReleaseApp
     "The app that this release belongs to."
@@ -480,14 +786,14 @@ class ListClient(BaseModel):
         alias="__typename", default="Client", exclude=True
     )
     id: ID
-    user: Optional[ListClientUser] = Field(default=None)
-    "If the client is a DEVELOPMENT client, which requires no further authentication, this is the user that is authenticated with the client."
+    user: ListClientUser | None = Field(default=None)
+    "The user this client acts for (derived from its membership)."
     name: str
-    "The name of the client. This is a human readable name of the client."
+    "A human-readable label for the client that folds in the app, version, operator and device — e.g. `com.example.app:v0.1.1 by Johannes on my-laptop`."
     kind: ClientKind
-    "The configuration of the client. This is the configuration that will be sent to the client. It should never contain sensitive information."
-    release: ListClientRelease
-    "The release that this client belongs to."
+    "What kind of principal this client is (its authentication strategy): DEVELOPMENT, WEBSITE, DESKTOP, MOBILE, HUB or RELYING_PARTY."
+    release: ListClientRelease | None = Field(default=None)
+    "The release that this client belongs to. Null for clients that are not bound to an app release (hub identities, relying parties, pending registrations)."
     model_config = ConfigDict(frozen=True)
 
     class Meta:
@@ -504,10 +810,10 @@ class Leaf(BaseModel):
     typename: Literal["LeafDescendant"] = Field(
         alias="__typename", default="LeafDescendant", exclude=True
     )
-    bold: Optional[bool] = Field(default=None)
-    italic: Optional[bool] = Field(default=None)
-    code: Optional[bool] = Field(default=None)
-    text: Optional[str] = Field(default=None)
+    bold: bool | None = Field(default=None)
+    italic: bool | None = Field(default=None)
+    code: bool | None = Field(default=None)
+    text: str | None = Field(default=None)
     model_config = ConfigDict(frozen=True)
 
     class Meta:
@@ -533,14 +839,14 @@ class CommentUserProfileAvatar(BaseModel):
 
 class CommentUserProfile(BaseModel):
     """
-    A Profile of a User. A Profile can be used to display personalied information about a user.
-
+    A Profile of a User. A Profile can be used to display personalised information about a user,
+    such as a display name, a short bio and an avatar.
     """
 
     typename: Literal["Profile"] = Field(
         alias="__typename", default="Profile", exclude=True
     )
-    avatar: Optional[CommentUserProfileAvatar] = Field(default=None)
+    avatar: CommentUserProfileAvatar | None = Field(default=None)
     "The avatar of the user"
     model_config = ConfigDict(frozen=True)
 
@@ -562,7 +868,7 @@ class CommentUser(BaseModel):
     id: ID
     username: str
     "Required. 150 characters or fewer. Letters, digits and @/./+/-/_ only."
-    avatar: Optional[str] = Field(default=None)
+    avatar: str | None = Field(default=None)
     profile: CommentUserProfile
     model_config = ConfigDict(frozen=True)
 
@@ -580,7 +886,7 @@ class Paragraph(BaseModel):
     typename: Literal["ParagraphDescendant"] = Field(
         alias="__typename", default="ParagraphDescendant", exclude=True
     )
-    size: Optional[str] = Field(default=None)
+    size: str | None = Field(default=None)
     model_config = ConfigDict(frozen=True)
 
     class Meta:
@@ -633,20 +939,17 @@ class ListGroupProfileAvatar(BaseModel):
 
 class ListGroupProfile(BaseModel):
     """
-    A Profile of a User. A Profile can be used to display personalied information about a user.
-
-
-
-
+    A Profile of a Group. A GroupProfile can be used to display information about a group,
+    such as a display name, a short bio and an avatar.
     """
 
     typename: Literal["GroupProfile"] = Field(
         alias="__typename", default="GroupProfile", exclude=True
     )
     id: ID
-    bio: Optional[str] = Field(default=None)
+    bio: str | None = Field(default=None)
     "A short bio of the group"
-    avatar: Optional[ListGroupProfileAvatar] = Field(default=None)
+    avatar: ListGroupProfileAvatar | None = Field(default=None)
     "The avatar of the group"
     model_config = ConfigDict(frozen=True)
 
@@ -662,7 +965,7 @@ class ListGroup(BaseModel):
     )
     id: ID
     name: str
-    profile: Optional[ListGroupProfile] = Field(default=None)
+    profile: ListGroupProfile | None = Field(default=None)
     model_config = ConfigDict(frozen=True)
 
     class Meta:
@@ -688,20 +991,17 @@ class GroupProfileAvatar(BaseModel):
 
 class GroupProfile(BaseModel):
     """
-    A Profile of a User. A Profile can be used to display personalied information about a user.
-
-
-
-
+    A Profile of a Group. A GroupProfile can be used to display information about a group,
+    such as a display name, a short bio and an avatar.
     """
 
     typename: Literal["GroupProfile"] = Field(
         alias="__typename", default="GroupProfile", exclude=True
     )
     id: ID
-    name: Optional[str] = Field(default=None)
+    name: str | None = Field(default=None)
     "The name of the group"
-    avatar: Optional[GroupProfileAvatar] = Field(default=None)
+    avatar: GroupProfileAvatar | None = Field(default=None)
     "The avatar of the group"
     model_config = ConfigDict(frozen=True)
 
@@ -711,6 +1011,44 @@ class GroupProfile(BaseModel):
         document = "fragment GroupProfile on GroupProfile {\n  id\n  name\n  avatar {\n    presignedUrl\n    __typename\n  }\n  __typename\n}"
         name = "GroupProfile"
         type = "GroupProfile"
+
+
+class LayerLogo(BaseModel):
+    """Small helper around S3-backed stored objects.
+
+    Provides convenience helpers for generating presigned URLs and
+    uploading content."""
+
+    typename: Literal["MediaStore"] = Field(
+        alias="__typename", default="MediaStore", exclude=True
+    )
+    presigned_url: str = Field(alias="presignedUrl")
+    model_config = ConfigDict(frozen=True)
+
+
+class Layer(BaseModel):
+    """A Layer is a network through which service instances can be reached (e.g. the public web, a tailnet, a VPN, or a docker network). Instance aliases are resolved relative to the layer they belong to."""
+
+    typename: Literal["Layer"] = Field(
+        alias="__typename", default="Layer", exclude=True
+    )
+    id: ID
+    name: str
+    "The name of the layer"
+    identifier: str
+    "The identifier of the layer. This should be a globally unique string that identifies the layer. We encourage you to use the reverse domain name notation. E.g. `com.example.mylayer`"
+    description: str | None = Field(default=None)
+    "The description of the layer. This should be a human readable description of the layer."
+    logo: LayerLogo | None = Field(default=None)
+    "The logo of the layer. This should be a url to a logo that can be used to represent the layer."
+    model_config = ConfigDict(frozen=True)
+
+    class Meta:
+        """Meta class for Layer"""
+
+        document = "fragment Layer on Layer {\n  id\n  name\n  identifier\n  description\n  logo {\n    presignedUrl\n    __typename\n  }\n  __typename\n}"
+        name = "Layer"
+        type = "Layer"
 
 
 class ListLayerLogo(BaseModel):
@@ -727,7 +1065,7 @@ class ListLayerLogo(BaseModel):
 
 
 class ListLayer(BaseModel):
-    """A Service is a Webservice that a Client might want to access. It is not the configured instance of the service, but the service itself."""
+    """A Layer is a network through which service instances can be reached (e.g. the public web, a tailnet, a VPN, or a docker network). Instance aliases are resolved relative to the layer they belong to."""
 
     typename: Literal["Layer"] = Field(
         alias="__typename", default="Layer", exclude=True
@@ -735,10 +1073,10 @@ class ListLayer(BaseModel):
     id: ID
     name: str
     "The name of the layer"
-    description: Optional[str] = Field(default=None)
-    "The description of the service. This should be a human readable description of the service."
-    logo: Optional[ListLayerLogo] = Field(default=None)
-    "The logo of the service. This should be a url to a logo that can be used to represent the service."
+    description: str | None = Field(default=None)
+    "The description of the layer. This should be a human readable description of the layer."
+    logo: ListLayerLogo | None = Field(default=None)
+    "The logo of the layer. This should be a url to a logo that can be used to represent the layer."
     model_config = ConfigDict(frozen=True)
 
     class Meta:
@@ -764,17 +1102,17 @@ class ProfileAvatar(BaseModel):
 
 class Profile(BaseModel):
     """
-    A Profile of a User. A Profile can be used to display personalied information about a user.
-
+    A Profile of a User. A Profile can be used to display personalised information about a user,
+    such as a display name, a short bio and an avatar.
     """
 
     typename: Literal["Profile"] = Field(
         alias="__typename", default="Profile", exclude=True
     )
     id: ID
-    name: Optional[str] = Field(default=None)
+    name: str | None = Field(default=None)
     "The name of the user"
-    avatar: Optional[ProfileAvatar] = Field(default=None)
+    avatar: ProfileAvatar | None = Field(default=None)
     "The avatar of the user"
     model_config = ConfigDict(frozen=True)
 
@@ -801,7 +1139,7 @@ class ListRedeemTokenUser(BaseModel):
 
     typename: Literal["User"] = Field(alias="__typename", default="User", exclude=True)
     id: ID
-    email: Optional[str] = Field(default=None)
+    email: str | None = Field(default=None)
     model_config = ConfigDict(frozen=True)
 
 
@@ -838,8 +1176,8 @@ class ListRedeemTokenClient(BaseModel):
         alias="__typename", default="Client", exclude=True
     )
     id: ID
-    release: ListRedeemTokenClientRelease
-    "The release that this client belongs to."
+    release: ListRedeemTokenClientRelease | None = Field(default=None)
+    "The release that this client belongs to. Null for clients that are not bound to an app release (hub identities, relying parties, pending registrations)."
     model_config = ConfigDict(frozen=True)
 
 
@@ -859,7 +1197,7 @@ class ListRedeemToken(BaseModel):
     "The token of the redeem token"
     user: ListRedeemTokenUser
     "The user that this redeem token belongs to."
-    client: Optional[ListRedeemTokenClient] = Field(default=None)
+    client: ListRedeemTokenClient | None = Field(default=None)
     "The client that this redeem token belongs to."
     model_config = ConfigDict(frozen=True)
 
@@ -868,6 +1206,101 @@ class ListRedeemToken(BaseModel):
 
         document = "fragment ListRedeemToken on RedeemToken {\n  id\n  token\n  user {\n    id\n    email\n    __typename\n  }\n  client {\n    id\n    release {\n      version\n      app {\n        identifier\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n  __typename\n}"
         name = "ListRedeemToken"
+        type = "RedeemToken"
+
+
+class DetailRedeemTokenUser(BaseModel):
+    """
+    A User is a person that can log in to the system. They are uniquely identified by their username.
+    And can have an email address associated with them (but don't have to).
+
+    A user can be assigned to groups and has a profile that can be used to display information about them.
+    Detail information about a user can be found in the profile.
+
+    All users can have social accounts associated with them. These are used to authenticate the user with external services,
+    such as ORCID or GitHub.
+
+    """
+
+    typename: Literal["User"] = Field(alias="__typename", default="User", exclude=True)
+    id: ID
+    email: str | None = Field(default=None)
+    model_config = ConfigDict(frozen=True)
+
+
+class DetailRedeemTokenClientReleaseApp(BaseModel):
+    """An App is the Arkitekt equivalent of a Software Application. It is a collection of `Releases` that can be all part of the same application. E.g the App `Napari` could have the releases `0.1.0` and `0.2.0`."""
+
+    typename: Literal["App"] = Field(alias="__typename", default="App", exclude=True)
+    identifier: str
+    "The identifier of the app. This should be a globally unique string that identifies the app. We encourage you to use the reverse domain name notation. E.g. `com.example.myapp`"
+    model_config = ConfigDict(frozen=True)
+
+
+class DetailRedeemTokenClientRelease(BaseModel):
+    """A Release is a version of an app. Releases might change over time. E.g. a release might be updated to fix a bug, and the release might be updated to add a new feature. This is why they are the home for `scopes` and `requirements`, which might change over the release cycle."""
+
+    typename: Literal["Release"] = Field(
+        alias="__typename", default="Release", exclude=True
+    )
+    version: str
+    "The version of the release. This should be a string that identifies the version of the release. We enforce semantic versioning notation. E.g. `0.1.0`. The version is unique per app."
+    app: DetailRedeemTokenClientReleaseApp
+    "The app that this release belongs to."
+    model_config = ConfigDict(frozen=True)
+
+
+class DetailRedeemTokenClient(BaseModel):
+    """A client is a way of authenticating users with a release.
+    The strategy of authentication is defined by the kind of client. And allows for different authentication flow.
+    E.g a client can be a DESKTOP app, that might be used by multiple users, or a WEBSITE that wants to connect to a user's account,
+    but also a DEVELOPMENT client that is used by a developer to test the app. The client model thinly wraps the oauth2 client model, which is used to authenticate users.
+    """
+
+    typename: Literal["Client"] = Field(
+        alias="__typename", default="Client", exclude=True
+    )
+    id: ID
+    client_id: str = Field(alias="clientId")
+    "The OAuth2 client id this client authenticates as."
+    release: DetailRedeemTokenClientRelease | None = Field(default=None)
+    "The release that this client belongs to. Null for clients that are not bound to an app release (hub identities, relying parties, pending registrations)."
+    model_config = ConfigDict(frozen=True)
+
+
+class DetailRedeemToken(BaseModel):
+    """A redeem token is a token that can be used to redeem the rights to create
+    a client. It is used to give the recipient the right to create a client.
+
+    If the token is not redeemed within the expires_at time, it will be invalid.
+    If the token has been redeemed, but the manifest has changed, the token will be invalid.
+    """
+
+    typename: Literal["RedeemToken"] = Field(
+        alias="__typename", default="RedeemToken", exclude=True
+    )
+    id: ID
+    token: str
+    "The token of the redeem token"
+    expires_at: datetime | None = Field(default=None, alias="expiresAt")
+    "When this token stops being redeemable. Null means never."
+    max_redemptions: int | None = Field(default=None, alias="maxRedemptions")
+    "How many times this token may be redeemed. Null means unlimited."
+    redemption_count: int = Field(alias="redemptionCount")
+    "How many times this token has been redeemed so far."
+    pinned_manifest: Any | None = Field(default=None, alias="pinnedManifest")
+    "The manifest this token was pre-authorized for at mint time, or null for an unpinned token. A redeem must match its identifier, version and node_id exactly and may only request a subset of its scopes and requirements."
+    user: DetailRedeemTokenUser
+    "The user that this redeem token belongs to."
+    client: DetailRedeemTokenClient | None = Field(default=None)
+    "The client that this redeem token belongs to."
+    model_config = ConfigDict(frozen=True)
+
+    class Meta:
+        """Meta class for DetailRedeemToken"""
+
+        document = "fragment DetailRedeemToken on RedeemToken {\n  id\n  token\n  expiresAt\n  maxRedemptions\n  redemptionCount\n  pinnedManifest\n  user {\n    id\n    email\n    __typename\n  }\n  client {\n    id\n    clientId\n    release {\n      version\n      app {\n        identifier\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n  __typename\n}"
+        name = "DetailRedeemToken"
         type = "RedeemToken"
 
 
@@ -895,9 +1328,9 @@ class Service(BaseModel):
     id: ID
     name: str
     "The name of the service"
-    logo: Optional[ServiceLogo] = Field(default=None)
-    "The logo of the app. This should be a url to a logo that can be used to represent the app."
-    description: Optional[str] = Field(default=None)
+    logo: ServiceLogo | None = Field(default=None)
+    "The logo of the service. This should be a url to a logo that can be used to represent the service."
+    description: str | None = Field(default=None)
     "The description of the service. This should be a human readable description of the service."
     model_config = ConfigDict(frozen=True)
 
@@ -972,11 +1405,11 @@ class Stash(BaseModel):
     )
     id: ID
     name: str
-    description: Optional[str] = Field(default=None)
+    description: str | None = Field(default=None)
     created_at: datetime = Field(alias="createdAt")
     updated_at: datetime = Field(alias="updatedAt")
     owner: StashOwner
-    "The number of items in the stash"
+    "The owner of the stash"
     model_config = ConfigDict(frozen=True)
 
     class Meta:
@@ -1024,10 +1457,10 @@ class ListUser(BaseModel):
     typename: Literal["User"] = Field(alias="__typename", default="User", exclude=True)
     username: str
     "Required. 150 characters or fewer. Letters, digits and @/./+/-/_ only."
-    first_name: Optional[str] = Field(default=None, alias="firstName")
-    last_name: Optional[str] = Field(default=None, alias="lastName")
-    email: Optional[str] = Field(default=None)
-    avatar: Optional[str] = Field(default=None)
+    first_name: str | None = Field(default=None, alias="firstName")
+    last_name: str | None = Field(default=None, alias="lastName")
+    email: str | None = Field(default=None)
+    avatar: str | None = Field(default=None)
     id: ID
     model_config = ConfigDict(frozen=True)
 
@@ -1056,10 +1489,10 @@ class MeUser(BaseModel):
     id: ID
     username: str
     "Required. 150 characters or fewer. Letters, digits and @/./+/-/_ only."
-    email: Optional[str] = Field(default=None)
-    first_name: Optional[str] = Field(default=None, alias="firstName")
-    last_name: Optional[str] = Field(default=None, alias="lastName")
-    avatar: Optional[str] = Field(default=None)
+    email: str | None = Field(default=None)
+    first_name: str | None = Field(default=None, alias="firstName")
+    last_name: str | None = Field(default=None, alias="lastName")
+    avatar: str | None = Field(default=None)
     model_config = ConfigDict(frozen=True)
 
     class Meta:
@@ -1092,7 +1525,7 @@ class ListRelease(BaseModel):
     id: ID
     version: str
     "The version of the release. This should be a string that identifies the version of the release. We enforce semantic versioning notation. E.g. `0.1.0`. The version is unique per app."
-    logo: Optional[ListReleaseLogo] = Field(default=None)
+    logo: ListReleaseLogo | None = Field(default=None)
     "The logo of the release. This should be a url to a logo that can be used to represent the release."
     app: ListApp
     "The app that this release belongs to."
@@ -1128,11 +1561,11 @@ class DetailRelease(BaseModel):
     id: ID
     version: str
     "The version of the release. This should be a string that identifies the version of the release. We enforce semantic versioning notation. E.g. `0.1.0`. The version is unique per app."
-    logo: Optional[DetailReleaseLogo] = Field(default=None)
+    logo: DetailReleaseLogo | None = Field(default=None)
     "The logo of the release. This should be a url to a logo that can be used to represent the release."
     app: ListApp
     "The app that this release belongs to."
-    clients: Tuple[ListClient, ...]
+    clients: tuple[ListClient, ...]
     "The clients of the release"
     model_config = ConfigDict(frozen=True)
 
@@ -1150,7 +1583,7 @@ class Mention(BaseModel):
     typename: Literal["MentionDescendant"] = Field(
         alias="__typename", default="MentionDescendant", exclude=True
     )
-    user: Optional[CommentUser] = Field(default=None)
+    user: CommentUser | None = Field(default=None)
     model_config = ConfigDict(frozen=True)
 
     class Meta:
@@ -1192,11 +1625,11 @@ class DetailUser(BaseModel):
     id: ID
     username: str
     "Required. 150 characters or fewer. Letters, digits and @/./+/-/_ only."
-    email: Optional[str] = Field(default=None)
-    first_name: Optional[str] = Field(default=None, alias="firstName")
-    last_name: Optional[str] = Field(default=None, alias="lastName")
-    avatar: Optional[str] = Field(default=None)
-    groups: Tuple[DetailUserGroups, ...]
+    email: str | None = Field(default=None)
+    first_name: str | None = Field(default=None, alias="firstName")
+    last_name: str | None = Field(default=None, alias="lastName")
+    avatar: str | None = Field(default=None)
+    groups: tuple[DetailUserGroups, ...]
     "The groups this user belongs to. A user will get all permissions granted to each of their groups."
     profile: Profile
     model_config = ConfigDict(frozen=True)
@@ -1220,7 +1653,7 @@ class ListService(BaseModel):
     id: ID
     name: str
     "The name of the service"
-    releases: Tuple[ListServiceRelease, ...]
+    releases: tuple[ListServiceRelease, ...]
     "The releases of the service. A service release is a specific version of a service. It will be configured by a configuration backend and will be used to send to the client as a configuration. It should never contain sensitive information."
     model_config = ConfigDict(frozen=True)
 
@@ -1240,7 +1673,7 @@ class ListStash(Stash, BaseModel):
     typename: Literal["Stash"] = Field(
         alias="__typename", default="Stash", exclude=True
     )
-    items: Tuple[StashItem, ...]
+    items: tuple[StashItem, ...]
     model_config = ConfigDict(frozen=True)
 
     class Meta:
@@ -1262,9 +1695,9 @@ class DetailGroup(BaseModel):
     )
     id: ID
     name: str
-    users: Tuple[ListUser, ...]
+    users: tuple[ListUser, ...]
     "The users that are in the group"
-    profile: Optional[GroupProfile] = Field(default=None)
+    profile: GroupProfile | None = Field(default=None)
     model_config = ConfigDict(frozen=True)
 
     class Meta:
@@ -1284,9 +1717,9 @@ class ListServiceInstance(BaseModel):
     id: ID
     instance_id: ID = Field(alias="instanceId")
     "The instance id of the instance. This is a unique string that identifies the instance. It is used to identify the instance in the code and in the database."
-    allowed_users: Tuple[ListUser, ...] = Field(alias="allowedUsers")
+    allowed_users: tuple[ListUser, ...] = Field(alias="allowedUsers")
     "The users that are allowed to use this instance."
-    denied_users: Tuple[ListUser, ...] = Field(alias="deniedUsers")
+    denied_users: tuple[ListUser, ...] = Field(alias="deniedUsers")
     "The users that are denied to use this instance."
     model_config = ConfigDict(frozen=True)
 
@@ -1318,9 +1751,9 @@ class DetailApp(BaseModel):
     id: ID
     identifier: str
     "The identifier of the app. This should be a globally unique string that identifies the app. We encourage you to use the reverse domain name notation. E.g. `com.example.myapp`"
-    logo: Optional[DetailAppLogo] = Field(default=None)
+    logo: DetailAppLogo | None = Field(default=None)
     "The logo of the app. This should be a url to a logo that can be used to represent the app."
-    releases: Tuple[ListRelease, ...]
+    releases: tuple[ListRelease, ...]
     "The releases of the app. A release is a version of the app that can be installed by a user."
     model_config = ConfigDict(frozen=True)
 
@@ -1336,7 +1769,7 @@ class DescendantChildrenChildrenBase(BaseModel):
     """A descendant of a comment. Descendend are used to render rich text in the frontend."""
 
     kind: DescendantKind
-    unsafe_children: Optional[Tuple[Any, ...]] = Field(
+    unsafe_children: tuple[Any, ...] | None = Field(
         default=None, alias="unsafeChildren"
     )
     "Unsafe children are not typed and fall back to json. This is a workaround if queries get too complex."
@@ -1383,22 +1816,19 @@ class DescendantChildrenBase(BaseModel):
     """A descendant of a comment. Descendend are used to render rich text in the frontend."""
 
     kind: DescendantKind
-    children: Optional[
-        Tuple[
-            Union[
-                Annotated[
-                    Union[
-                        DescendantChildrenChildrenBaseLeafDescendant,
-                        DescendantChildrenChildrenBaseMentionDescendant,
-                        DescendantChildrenChildrenBaseParagraphDescendant,
-                    ],
-                    Field(discriminator="typename"),
-                ],
-                DescendantChildrenChildrenBaseCatchAll,
-            ],
+    children: (
+        tuple[
+            Annotated[
+                DescendantChildrenChildrenBaseLeafDescendant
+                | DescendantChildrenChildrenBaseMentionDescendant
+                | DescendantChildrenChildrenBaseParagraphDescendant,
+                Field(discriminator="typename"),
+            ]
+            | DescendantChildrenChildrenBaseCatchAll,
             ...,
         ]
-    ] = Field(default=None)
+        | None
+    ) = Field(default=None)
     model_config = ConfigDict(frozen=True)
 
 
@@ -1440,22 +1870,19 @@ class DescendantBase(BaseModel):
     """A descendant of a comment. Descendend are used to render rich text in the frontend."""
 
     kind: DescendantKind
-    children: Optional[
-        Tuple[
-            Union[
-                Annotated[
-                    Union[
-                        DescendantChildrenBaseLeafDescendant,
-                        DescendantChildrenBaseMentionDescendant,
-                        DescendantChildrenBaseParagraphDescendant,
-                    ],
-                    Field(discriminator="typename"),
-                ],
-                DescendantChildrenBaseCatchAll,
-            ],
+    children: (
+        tuple[
+            Annotated[
+                DescendantChildrenBaseLeafDescendant
+                | DescendantChildrenBaseMentionDescendant
+                | DescendantChildrenBaseParagraphDescendant,
+                Field(discriminator="typename"),
+            ]
+            | DescendantChildrenBaseCatchAll,
             ...,
         ]
-    ] = Field(default=None)
+        | None
+    ) = Field(default=None)
 
 
 class DescendantCatch(DescendantBase):
@@ -1464,22 +1891,19 @@ class DescendantCatch(DescendantBase):
     typename: str = Field(alias="__typename", exclude=True)
     "A descendant of a comment. Descendend are used to render rich text in the frontend."
     kind: DescendantKind
-    children: Optional[
-        Tuple[
-            Union[
-                Annotated[
-                    Union[
-                        DescendantChildrenBaseLeafDescendant,
-                        DescendantChildrenBaseMentionDescendant,
-                        DescendantChildrenBaseParagraphDescendant,
-                    ],
-                    Field(discriminator="typename"),
-                ],
-                DescendantChildrenBaseCatchAll,
-            ],
+    children: (
+        tuple[
+            Annotated[
+                DescendantChildrenBaseLeafDescendant
+                | DescendantChildrenBaseMentionDescendant
+                | DescendantChildrenBaseParagraphDescendant,
+                Field(discriminator="typename"),
+            ]
+            | DescendantChildrenBaseCatchAll,
             ...,
         ]
-    ] = Field(default=None)
+        | None
+    ) = Field(default=None)
 
 
 class DescendantLeafDescendant(Leaf, DescendantBase, BaseModel):
@@ -1506,44 +1930,6 @@ class DescendantParagraphDescendant(Paragraph, DescendantBase, BaseModel):
     )
 
 
-class LayerLogo(BaseModel):
-    """Small helper around S3-backed stored objects.
-
-    Provides convenience helpers for generating presigned URLs and
-    uploading content."""
-
-    typename: Literal["MediaStore"] = Field(
-        alias="__typename", default="MediaStore", exclude=True
-    )
-    presigned_url: str = Field(alias="presignedUrl")
-    model_config = ConfigDict(frozen=True)
-
-
-class Layer(BaseModel):
-    """A Service is a Webservice that a Client might want to access. It is not the configured instance of the service, but the service itself."""
-
-    typename: Literal["Layer"] = Field(
-        alias="__typename", default="Layer", exclude=True
-    )
-    id: ID
-    name: str
-    "The name of the layer"
-    description: Optional[str] = Field(default=None)
-    "The description of the service. This should be a human readable description of the service."
-    logo: Optional[LayerLogo] = Field(default=None)
-    "The logo of the service. This should be a url to a logo that can be used to represent the service."
-    instances: Tuple[ListServiceInstance, ...]
-    "The instances of the service. A service instance is a configured instance of a service. It will be configured by a configuration backend and will be used to send to the client as a configuration. It should never contain sensitive information."
-    model_config = ConfigDict(frozen=True)
-
-    class Meta:
-        """Meta class for Layer"""
-
-        document = "fragment ListUser on User {\n  username\n  firstName\n  lastName\n  email\n  avatar\n  id\n  __typename\n}\n\nfragment ListServiceInstance on ServiceInstance {\n  id\n  instanceId\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  __typename\n}\n\nfragment Layer on Layer {\n  id\n  name\n  description\n  logo {\n    presignedUrl\n    __typename\n  }\n  instances {\n    ...ListServiceInstance\n    __typename\n  }\n  __typename\n}"
-        name = "Layer"
-        type = "Layer"
-
-
 class ServiceReleaseService(BaseModel):
     """A Service is a Webservice that a Client might want to access. It is not the configured instance of the service, but the service itself."""
 
@@ -1567,7 +1953,7 @@ class ServiceRelease(BaseModel):
     "The service that this release belongs to."
     version: str
     "The version of the service. This should be a human readable version string."
-    instances: Tuple[ListServiceInstance, ...]
+    instances: tuple[ListServiceInstance, ...]
     "The instances of the service. A service instance is a configured instance of a service. It will be configured by a configuration backend and will be used to send to the client as a configuration. It should never contain sensitive information."
     model_config = ConfigDict(frozen=True)
 
@@ -1580,18 +1966,18 @@ class ServiceRelease(BaseModel):
 
 
 class ListServiceInstanceMapping(BaseModel):
-    """A ServiceInstance is a configured instance of a Service. It will be configured by a configuration backend and will be used to send to the client as a configuration. It should never contain sensitive information."""
+    """A ServiceInstanceMapping binds one of a client's requirements (by key) to the ServiceInstance that fulfils it. The set of mappings of a client is its composed configuration."""
 
     typename: Literal["ServiceInstanceMapping"] = Field(
         alias="__typename", default="ServiceInstanceMapping", exclude=True
     )
     id: ID
     key: str
-    "The key of the instance. This is a unique string that identifies the instance. It is used to identify the instance in the code and in the database."
+    "The requirement key of the client that this mapping fulfils. Unique per client."
     instance: ListServiceInstance
-    "The service that this instance belongs to."
+    "The service instance this requirement is mapped to."
     client: ListClient
-    "The client that this instance belongs to."
+    "The client whose requirement this mapping fulfils."
     optional: bool
     "Is this mapping optional? If a mapping is optional, you can configure the client without this mapping."
     model_config = ConfigDict(frozen=True)
@@ -1686,22 +2072,18 @@ class SubthreadComment(BaseModel):
     )
     user: CommentUser
     "The user that created this comment"
-    parent: Optional[SubthreadCommentParent] = Field(default=None)
+    parent: SubthreadCommentParent | None = Field(default=None)
     "The parent of this comment. Think Thread"
     created_at: datetime = Field(alias="createdAt")
     "The time this comment got created"
-    descendants: Tuple[
-        Union[
-            Annotated[
-                Union[
-                    SubthreadCommentDescendantsBaseLeafDescendant,
-                    SubthreadCommentDescendantsBaseMentionDescendant,
-                    SubthreadCommentDescendantsBaseParagraphDescendant,
-                ],
-                Field(discriminator="typename"),
-            ],
-            SubthreadCommentDescendantsBaseCatchAll,
-        ],
+    descendants: tuple[
+        Annotated[
+            SubthreadCommentDescendantsBaseLeafDescendant
+            | SubthreadCommentDescendantsBaseMentionDescendant
+            | SubthreadCommentDescendantsBaseParagraphDescendant,
+            Field(discriminator="typename"),
+        ]
+        | SubthreadCommentDescendantsBaseCatchAll,
         ...,
     ]
     "The immediate descendends of the comments. Think typed Rich Representation"
@@ -1748,16 +2130,6 @@ class DetailClientLogo(BaseModel):
     model_config = ConfigDict(frozen=True)
 
 
-class DetailClientOauth2client(BaseModel):
-    """OAuth2Client(id, membership, client_id, client_secret, redirect_uris, scope, token_endpoint_auth_method, grant_types, response_types, id_token_signed_response_alg)"""
-
-    typename: Literal["Oauth2Client"] = Field(
-        alias="__typename", default="Oauth2Client", exclude=True
-    )
-    client_id: str = Field(alias="clientId")
-    model_config = ConfigDict(frozen=True)
-
-
 class DetailClient(BaseModel):
     """A client is a way of authenticating users with a release.
     The strategy of authentication is defined by the kind of client. And allows for different authentication flow.
@@ -1769,30 +2141,28 @@ class DetailClient(BaseModel):
         alias="__typename", default="Client", exclude=True
     )
     id: ID
-    token: str
-    "The configuration of the client. This is the configuration that will be sent to the client. It should never contain sensitive information."
     name: str
-    "The name of the client. This is a human readable name of the client."
-    user: Optional[DetailClientUser] = Field(default=None)
-    "If the client is a DEVELOPMENT client, which requires no further authentication, this is the user that is authenticated with the client."
+    "A human-readable label for the client that folds in the app, version, operator and device — e.g. `com.example.app:v0.1.1 by Johannes on my-laptop`."
+    client_id: str = Field(alias="clientId")
+    "The OAuth2 client id this client authenticates as."
+    user: DetailClientUser | None = Field(default=None)
+    "The user this client acts for (derived from its membership)."
     kind: ClientKind
-    "The configuration of the client. This is the configuration that will be sent to the client. It should never contain sensitive information."
-    release: ListRelease
-    "The release that this client belongs to."
-    logo: Optional[DetailClientLogo] = Field(default=None)
+    "What kind of principal this client is (its authentication strategy): DEVELOPMENT, WEBSITE, DESKTOP, MOBILE, HUB or RELYING_PARTY."
+    release: ListRelease | None = Field(default=None)
+    "The release that this client belongs to. Null for clients that are not bound to an app release (hub identities, relying parties, pending registrations)."
+    logo: DetailClientLogo | None = Field(default=None)
     "The logo of the release. This should be a url to a logo that can be used to represent the release."
-    oauth2_client: DetailClientOauth2client = Field(alias="oauth2Client")
-    "The real oauth2 client that is used to authenticate users with this client."
-    mappings: Tuple[ListServiceInstanceMapping, ...]
-    "The mappings of the client. A mapping is a mapping of a service to a service instance. This is used to configure the composition."
-    issue_url: Optional[str] = Field(default=None, alias="issueUrl")
+    mappings: tuple[ListServiceInstanceMapping, ...]
+    "The mappings of the client. A mapping is a mapping of a service to a service instance. This is used to configure the hub."
+    issue_url: str | None = Field(default=None, alias="issueUrl")
     "The issue url of the client. This is the url where users can report issues and get more information about the client."
     model_config = ConfigDict(frozen=True)
 
     class Meta:
         """Meta class for DetailClient"""
 
-        document = "fragment ListUser on User {\n  username\n  firstName\n  lastName\n  email\n  avatar\n  id\n  __typename\n}\n\nfragment ListApp on App {\n  id\n  identifier\n  logo {\n    presignedUrl\n    __typename\n  }\n  __typename\n}\n\nfragment ListClient on Client {\n  id\n  user {\n    id\n    username\n    __typename\n  }\n  name\n  kind\n  release {\n    version\n    logo {\n      presignedUrl\n      __typename\n    }\n    app {\n      id\n      identifier\n      logo {\n        presignedUrl\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment ListServiceInstance on ServiceInstance {\n  id\n  instanceId\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  __typename\n}\n\nfragment ListRelease on Release {\n  id\n  version\n  logo {\n    presignedUrl\n    __typename\n  }\n  app {\n    ...ListApp\n    __typename\n  }\n  __typename\n}\n\nfragment ListServiceInstanceMapping on ServiceInstanceMapping {\n  id\n  key\n  instance {\n    ...ListServiceInstance\n    __typename\n  }\n  client {\n    ...ListClient\n    __typename\n  }\n  optional\n  __typename\n}\n\nfragment DetailClient on Client {\n  id\n  token\n  name\n  user {\n    id\n    username\n    __typename\n  }\n  kind\n  release {\n    ...ListRelease\n    __typename\n  }\n  logo {\n    presignedUrl\n    __typename\n  }\n  oauth2Client {\n    clientId\n    __typename\n  }\n  mappings {\n    ...ListServiceInstanceMapping\n    __typename\n  }\n  issueUrl\n  __typename\n}"
+        document = "fragment ListUser on User {\n  username\n  firstName\n  lastName\n  email\n  avatar\n  id\n  __typename\n}\n\nfragment ListApp on App {\n  id\n  identifier\n  logo {\n    presignedUrl\n    __typename\n  }\n  __typename\n}\n\nfragment ListClient on Client {\n  id\n  user {\n    id\n    username\n    __typename\n  }\n  name\n  kind\n  release {\n    version\n    logo {\n      presignedUrl\n      __typename\n    }\n    app {\n      id\n      identifier\n      logo {\n        presignedUrl\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment ListServiceInstance on ServiceInstance {\n  id\n  instanceId\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  __typename\n}\n\nfragment ListRelease on Release {\n  id\n  version\n  logo {\n    presignedUrl\n    __typename\n  }\n  app {\n    ...ListApp\n    __typename\n  }\n  __typename\n}\n\nfragment ListServiceInstanceMapping on ServiceInstanceMapping {\n  id\n  key\n  instance {\n    ...ListServiceInstance\n    __typename\n  }\n  client {\n    ...ListClient\n    __typename\n  }\n  optional\n  __typename\n}\n\nfragment DetailClient on Client {\n  id\n  name\n  clientId\n  user {\n    id\n    username\n    __typename\n  }\n  kind\n  release {\n    ...ListRelease\n    __typename\n  }\n  logo {\n    presignedUrl\n    __typename\n  }\n  mappings {\n    ...ListServiceInstanceMapping\n    __typename\n  }\n  issueUrl\n  __typename\n}"
         name = "DetailClient"
         type = "Client"
 
@@ -1846,17 +2216,17 @@ class ServiceInstance(BaseModel):
     "The instance id of the instance. This is a unique string that identifies the instance. It is used to identify the instance in the code and in the database."
     release: ServiceInstanceRelease
     "The service release that this instance belongs to."
-    allowed_users: Tuple[ListUser, ...] = Field(alias="allowedUsers")
+    allowed_users: tuple[ListUser, ...] = Field(alias="allowedUsers")
     "The users that are allowed to use this instance."
-    denied_users: Tuple[ListUser, ...] = Field(alias="deniedUsers")
+    denied_users: tuple[ListUser, ...] = Field(alias="deniedUsers")
     "The users that are denied to use this instance."
-    allowed_groups: Tuple[ListGroup, ...] = Field(alias="allowedGroups")
+    allowed_groups: tuple[ListGroup, ...] = Field(alias="allowedGroups")
     "The groups that are allowed to use this instance."
-    denied_groups: Tuple[ListGroup, ...] = Field(alias="deniedGroups")
+    denied_groups: tuple[ListGroup, ...] = Field(alias="deniedGroups")
     "The groups that are denied to use this instance."
-    mappings: Tuple[ListServiceInstanceMapping, ...]
-    "The mappings of the composition. A mapping is a mapping of a service to a service instance. This is used to configure the composition."
-    logo: Optional[ServiceInstanceLogo] = Field(default=None)
+    mappings: tuple[ListServiceInstanceMapping, ...]
+    "The mappings of the hub. A mapping is a mapping of a service to a service instance. This is used to configure the hub."
+    logo: ServiceInstanceLogo | None = Field(default=None)
     "The logo of the app. This should be a url to a logo that can be used to represent the app."
     model_config = ConfigDict(frozen=True)
 
@@ -1948,30 +2318,26 @@ class ListComment(BaseModel):
     )
     user: CommentUser
     "The user that created this comment"
-    parent: Optional[ListCommentParent] = Field(default=None)
+    parent: ListCommentParent | None = Field(default=None)
     "The parent of this comment. Think Thread"
-    descendants: Tuple[
-        Union[
-            Annotated[
-                Union[
-                    ListCommentDescendantsBaseLeafDescendant,
-                    ListCommentDescendantsBaseMentionDescendant,
-                    ListCommentDescendantsBaseParagraphDescendant,
-                ],
-                Field(discriminator="typename"),
-            ],
-            ListCommentDescendantsBaseCatchAll,
-        ],
+    descendants: tuple[
+        Annotated[
+            ListCommentDescendantsBaseLeafDescendant
+            | ListCommentDescendantsBaseMentionDescendant
+            | ListCommentDescendantsBaseParagraphDescendant,
+            Field(discriminator="typename"),
+        ]
+        | ListCommentDescendantsBaseCatchAll,
         ...,
     ]
     "The immediate descendends of the comments. Think typed Rich Representation"
     resolved: bool
-    resolved_by: Optional[CommentUser] = Field(default=None, alias="resolvedBy")
+    resolved_by: CommentUser | None = Field(default=None, alias="resolvedBy")
     "The user that resolved this comment"
     id: ID
     created_at: datetime = Field(alias="createdAt")
     "The time this comment got created"
-    children: Tuple[SubthreadComment, ...]
+    children: tuple[SubthreadComment, ...]
     "The children of this comment"
     model_config = ConfigDict(frozen=True)
 
@@ -2063,32 +2429,28 @@ class MentionComment(BaseModel):
     )
     user: CommentUser
     "The user that created this comment"
-    parent: Optional[MentionCommentParent] = Field(default=None)
+    parent: MentionCommentParent | None = Field(default=None)
     "The parent of this comment. Think Thread"
-    descendants: Tuple[
-        Union[
-            Annotated[
-                Union[
-                    MentionCommentDescendantsBaseLeafDescendant,
-                    MentionCommentDescendantsBaseMentionDescendant,
-                    MentionCommentDescendantsBaseParagraphDescendant,
-                ],
-                Field(discriminator="typename"),
-            ],
-            MentionCommentDescendantsBaseCatchAll,
-        ],
+    descendants: tuple[
+        Annotated[
+            MentionCommentDescendantsBaseLeafDescendant
+            | MentionCommentDescendantsBaseMentionDescendant
+            | MentionCommentDescendantsBaseParagraphDescendant,
+            Field(discriminator="typename"),
+        ]
+        | MentionCommentDescendantsBaseCatchAll,
         ...,
     ]
     "The immediate descendends of the comments. Think typed Rich Representation"
     id: ID
     created_at: datetime = Field(alias="createdAt")
     "The time this comment got created"
-    children: Tuple[SubthreadComment, ...]
+    children: tuple[SubthreadComment, ...]
     "The children of this comment"
-    mentions: Tuple[CommentUser, ...]
+    mentions: tuple[CommentUser, ...]
     "The users that got mentioned in this comment"
     resolved: bool
-    resolved_by: Optional[CommentUser] = Field(default=None, alias="resolvedBy")
+    resolved_by: CommentUser | None = Field(default=None, alias="resolvedBy")
     "The user that resolved this comment"
     object: str
     "The object id of the object, on its associated service"
@@ -2184,32 +2546,28 @@ class DetailComment(BaseModel):
     )
     user: CommentUser
     "The user that created this comment"
-    parent: Optional[DetailCommentParent] = Field(default=None)
+    parent: DetailCommentParent | None = Field(default=None)
     "The parent of this comment. Think Thread"
-    descendants: Tuple[
-        Union[
-            Annotated[
-                Union[
-                    DetailCommentDescendantsBaseLeafDescendant,
-                    DetailCommentDescendantsBaseMentionDescendant,
-                    DetailCommentDescendantsBaseParagraphDescendant,
-                ],
-                Field(discriminator="typename"),
-            ],
-            DetailCommentDescendantsBaseCatchAll,
-        ],
+    descendants: tuple[
+        Annotated[
+            DetailCommentDescendantsBaseLeafDescendant
+            | DetailCommentDescendantsBaseMentionDescendant
+            | DetailCommentDescendantsBaseParagraphDescendant,
+            Field(discriminator="typename"),
+        ]
+        | DetailCommentDescendantsBaseCatchAll,
         ...,
     ]
     "The immediate descendends of the comments. Think typed Rich Representation"
     id: ID
     resolved: bool
-    resolved_by: Optional[CommentUser] = Field(default=None, alias="resolvedBy")
+    resolved_by: CommentUser | None = Field(default=None, alias="resolvedBy")
     "The user that resolved this comment"
     created_at: datetime = Field(alias="createdAt")
     "The time this comment got created"
-    children: Tuple[SubthreadComment, ...]
+    children: tuple[SubthreadComment, ...]
     "The children of this comment"
-    mentions: Tuple[CommentUser, ...]
+    mentions: tuple[CommentUser, ...]
     "The users that got mentioned in this comment"
     object: str
     "The object id of the object, on its associated service"
@@ -2234,12 +2592,11 @@ class CreateClientMutation(BaseModel):
         """Arguments for CreateClient"""
 
         input: DevelopmentClientInput
-        model_config = ConfigDict(populate_by_name=True)
 
     class Meta:
         """Meta class for CreateClient"""
 
-        document = "fragment ListUser on User {\n  username\n  firstName\n  lastName\n  email\n  avatar\n  id\n  __typename\n}\n\nfragment ListApp on App {\n  id\n  identifier\n  logo {\n    presignedUrl\n    __typename\n  }\n  __typename\n}\n\nfragment ListClient on Client {\n  id\n  user {\n    id\n    username\n    __typename\n  }\n  name\n  kind\n  release {\n    version\n    logo {\n      presignedUrl\n      __typename\n    }\n    app {\n      id\n      identifier\n      logo {\n        presignedUrl\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment ListServiceInstance on ServiceInstance {\n  id\n  instanceId\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  __typename\n}\n\nfragment ListRelease on Release {\n  id\n  version\n  logo {\n    presignedUrl\n    __typename\n  }\n  app {\n    ...ListApp\n    __typename\n  }\n  __typename\n}\n\nfragment ListServiceInstanceMapping on ServiceInstanceMapping {\n  id\n  key\n  instance {\n    ...ListServiceInstance\n    __typename\n  }\n  client {\n    ...ListClient\n    __typename\n  }\n  optional\n  __typename\n}\n\nfragment DetailClient on Client {\n  id\n  token\n  name\n  user {\n    id\n    username\n    __typename\n  }\n  kind\n  release {\n    ...ListRelease\n    __typename\n  }\n  logo {\n    presignedUrl\n    __typename\n  }\n  oauth2Client {\n    clientId\n    __typename\n  }\n  mappings {\n    ...ListServiceInstanceMapping\n    __typename\n  }\n  issueUrl\n  __typename\n}\n\nmutation CreateClient($input: DevelopmentClientInput!) {\n  createDevelopmentalClient(input: $input) {\n    ...DetailClient\n    __typename\n  }\n}"
+        document = "fragment ListUser on User {\n  username\n  firstName\n  lastName\n  email\n  avatar\n  id\n  __typename\n}\n\nfragment ListApp on App {\n  id\n  identifier\n  logo {\n    presignedUrl\n    __typename\n  }\n  __typename\n}\n\nfragment ListClient on Client {\n  id\n  user {\n    id\n    username\n    __typename\n  }\n  name\n  kind\n  release {\n    version\n    logo {\n      presignedUrl\n      __typename\n    }\n    app {\n      id\n      identifier\n      logo {\n        presignedUrl\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment ListServiceInstance on ServiceInstance {\n  id\n  instanceId\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  __typename\n}\n\nfragment ListRelease on Release {\n  id\n  version\n  logo {\n    presignedUrl\n    __typename\n  }\n  app {\n    ...ListApp\n    __typename\n  }\n  __typename\n}\n\nfragment ListServiceInstanceMapping on ServiceInstanceMapping {\n  id\n  key\n  instance {\n    ...ListServiceInstance\n    __typename\n  }\n  client {\n    ...ListClient\n    __typename\n  }\n  optional\n  __typename\n}\n\nfragment DetailClient on Client {\n  id\n  name\n  clientId\n  user {\n    id\n    username\n    __typename\n  }\n  kind\n  release {\n    ...ListRelease\n    __typename\n  }\n  logo {\n    presignedUrl\n    __typename\n  }\n  mappings {\n    ...ListServiceInstanceMapping\n    __typename\n  }\n  issueUrl\n  __typename\n}\n\nmutation CreateClient($input: DevelopmentClientInput!) {\n  createDevelopmentalClient(input: $input) {\n    ...DetailClient\n    __typename\n  }\n}"
 
 
 class CreateCommentMutation(BaseModel):
@@ -2252,9 +2609,8 @@ class CreateCommentMutation(BaseModel):
 
         object: ID
         identifier: str
-        descendants: List[DescendantInput]
-        parent: Optional[ID] = Field(default=None)
-        model_config = ConfigDict(populate_by_name=True)
+        descendants: list[DescendantInput]
+        parent: ID | None = Field(default=None)
 
     class Meta:
         """Meta class for CreateComment"""
@@ -2270,9 +2626,8 @@ class ReplyToMutation(BaseModel):
     class Arguments(BaseModel):
         """Arguments for ReplyTo"""
 
-        descendants: List[DescendantInput]
+        descendants: list[DescendantInput]
         parent: ID
-        model_config = ConfigDict(populate_by_name=True)
 
     class Meta:
         """Meta class for ReplyTo"""
@@ -2289,7 +2644,6 @@ class ResolveCommentMutation(BaseModel):
         """Arguments for ResolveComment"""
 
         id: ID
-        model_config = ConfigDict(populate_by_name=True)
 
     class Meta:
         """Meta class for ResolveComment"""
@@ -2306,7 +2660,6 @@ class CreateGroupProfileMutation(BaseModel):
         """Arguments for CreateGroupProfile"""
 
         input: CreateGroupProfileInput
-        model_config = ConfigDict(populate_by_name=True)
 
     class Meta:
         """Meta class for CreateGroupProfile"""
@@ -2323,7 +2676,6 @@ class UpdateGroupProfileMutation(BaseModel):
         """Arguments for UpdateGroupProfile"""
 
         input: UpdateGroupProfileInput
-        model_config = ConfigDict(populate_by_name=True)
 
     class Meta:
         """Meta class for UpdateGroupProfile"""
@@ -2340,7 +2692,6 @@ class UpdateServiceInstanceMutation(BaseModel):
         """Arguments for UpdateServiceInstance"""
 
         input: UpdateServiceInstanceInput
-        model_config = ConfigDict(populate_by_name=True)
 
     class Meta:
         """Meta class for UpdateServiceInstance"""
@@ -2357,7 +2708,6 @@ class CreateServiceInstanceMutation(BaseModel):
         """Arguments for CreateServiceInstance"""
 
         input: CreateServiceInstanceInput
-        model_config = ConfigDict(populate_by_name=True)
 
     class Meta:
         """Meta class for CreateServiceInstance"""
@@ -2374,7 +2724,6 @@ class CreateUserProfileMutation(BaseModel):
         """Arguments for CreateUserProfile"""
 
         input: CreateProfileInput
-        model_config = ConfigDict(populate_by_name=True)
 
     class Meta:
         """Meta class for CreateUserProfile"""
@@ -2391,12 +2740,43 @@ class UpdateUserProfileMutation(BaseModel):
         """Arguments for UpdateUserProfile"""
 
         input: UpdateProfileInput
-        model_config = ConfigDict(populate_by_name=True)
 
     class Meta:
         """Meta class for UpdateUserProfile"""
 
         document = "fragment Profile on Profile {\n  id\n  name\n  avatar {\n    presignedUrl\n    __typename\n  }\n  __typename\n}\n\nmutation UpdateUserProfile($input: UpdateProfileInput!) {\n  updateProfile(input: $input) {\n    ...Profile\n    __typename\n  }\n}"
+
+
+class CreateRedeemTokenMutation(BaseModel):
+    """No documentation found for this operation."""
+
+    create_redeem_token: DetailRedeemToken = Field(alias="createRedeemToken")
+
+    class Arguments(BaseModel):
+        """Arguments for CreateRedeemToken"""
+
+        input: RedeemTokenInput
+
+    class Meta:
+        """Meta class for CreateRedeemToken"""
+
+        document = "fragment DetailRedeemToken on RedeemToken {\n  id\n  token\n  expiresAt\n  maxRedemptions\n  redemptionCount\n  pinnedManifest\n  user {\n    id\n    email\n    __typename\n  }\n  client {\n    id\n    clientId\n    release {\n      version\n      app {\n        identifier\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nmutation CreateRedeemToken($input: RedeemTokenInput!) {\n  createRedeemToken(input: $input) {\n    ...DetailRedeemToken\n    __typename\n  }\n}"
+
+
+class DeleteRedeemTokenMutation(BaseModel):
+    """No documentation found for this operation."""
+
+    delete_redeem_token: ID = Field(alias="deleteRedeemToken")
+
+    class Arguments(BaseModel):
+        """Arguments for DeleteRedeemToken"""
+
+        id: ID
+
+    class Meta:
+        """Meta class for DeleteRedeemToken"""
+
+        document = "mutation DeleteRedeemToken($id: ID!) {\n  deleteRedeemToken(input: {id: $id})\n}"
 
 
 class CreateStashMutation(BaseModel):
@@ -2408,9 +2788,8 @@ class CreateStashMutation(BaseModel):
     class Arguments(BaseModel):
         """Arguments for CreateStash"""
 
-        name: Optional[str] = Field(default=None)
-        description: Optional[str] = Field(default="")
-        model_config = ConfigDict(populate_by_name=True)
+        name: str | None = Field(default=None)
+        description: Annotated[str | None, GraphQLDefault("")] = Field(default=None)
 
     class Meta:
         """Meta class for CreateStash"""
@@ -2421,15 +2800,14 @@ class CreateStashMutation(BaseModel):
 class AddItemsToStashMutation(BaseModel):
     """No documentation found for this operation."""
 
-    add_items_to_stash: Tuple[StashItem, ...] = Field(alias="addItemsToStash")
+    add_items_to_stash: tuple[StashItem, ...] = Field(alias="addItemsToStash")
     "Add items to a stash"
 
     class Arguments(BaseModel):
         """Arguments for AddItemsToStash"""
 
         stash: ID
-        items: List[StashItemInput]
-        model_config = ConfigDict(populate_by_name=True)
+        items: list[StashItemInput]
 
     class Meta:
         """Meta class for AddItemsToStash"""
@@ -2440,14 +2818,13 @@ class AddItemsToStashMutation(BaseModel):
 class DeleteStashItemsMutation(BaseModel):
     """No documentation found for this operation."""
 
-    delete_stash_items: Tuple[ID, ...] = Field(alias="deleteStashItems")
+    delete_stash_items: tuple[ID, ...] = Field(alias="deleteStashItems")
     "Delete items from a stash"
 
     class Arguments(BaseModel):
         """Arguments for DeleteStashItems"""
 
-        items: List[ID]
-        model_config = ConfigDict(populate_by_name=True)
+        items: list[ID]
 
     class Meta:
         """Meta class for DeleteStashItems"""
@@ -2464,7 +2841,6 @@ class DeleteStashMutation(BaseModel):
         """Arguments for DeleteStash"""
 
         stash: ID
-        model_config = ConfigDict(populate_by_name=True)
 
     class Meta:
         """Meta class for DeleteStash"""
@@ -2482,7 +2858,6 @@ class RequestMediaUploadMutation(BaseModel):
 
         key: str
         datalayer: str
-        model_config = ConfigDict(populate_by_name=True)
 
     class Meta:
         """Meta class for RequestMediaUpload"""
@@ -2493,14 +2868,13 @@ class RequestMediaUploadMutation(BaseModel):
 class AppsQuery(BaseModel):
     """No documentation found for this operation."""
 
-    apps: Tuple[ListApp, ...]
+    apps: tuple[ListApp, ...]
 
     class Arguments(BaseModel):
         """Arguments for Apps"""
 
-        filters: Optional[AppFilter] = Field(default=None)
-        pagination: Optional[OffsetPaginationInput] = Field(default=None)
-        model_config = ConfigDict(populate_by_name=True)
+        filters: AppFilter | None = Field(default=None)
+        pagination: OffsetPaginationInput | None = Field(default=None)
 
     class Meta:
         """Meta class for Apps"""
@@ -2516,10 +2890,13 @@ class AppQuery(BaseModel):
     class Arguments(BaseModel):
         """Arguments for App"""
 
-        identifier: Optional[str] = Field(default=None)
-        id: Optional[ID] = Field(default=None)
-        client_id: Optional[ID] = Field(alias="clientId", default=None)
-        model_config = ConfigDict(populate_by_name=True)
+        identifier: str | None = Field(default=None)
+        id: ID | None = Field(default=None)
+        client_id: ID | None = Field(
+            validation_alias=AliasChoices("client_id", "clientId"),
+            serialization_alias="clientId",
+            default=None,
+        )
 
     class Meta:
         """Meta class for App"""
@@ -2536,7 +2913,6 @@ class DetailAppQuery(BaseModel):
         """Arguments for DetailApp"""
 
         id: ID
-        model_config = ConfigDict(populate_by_name=True)
 
     class Meta:
         """Meta class for DetailApp"""
@@ -2547,14 +2923,13 @@ class DetailAppQuery(BaseModel):
 class ClientsQuery(BaseModel):
     """No documentation found for this operation."""
 
-    clients: Tuple[ListClient, ...]
+    clients: tuple[ListClient, ...]
 
     class Arguments(BaseModel):
         """Arguments for Clients"""
 
-        filters: Optional[ClientFilter] = Field(default=None)
-        pagination: Optional[OffsetPaginationInput] = Field(default=None)
-        model_config = ConfigDict(populate_by_name=True)
+        filters: ClientFilter | None = Field(default=None)
+        pagination: OffsetPaginationInput | None = Field(default=None)
 
     class Meta:
         """Meta class for Clients"""
@@ -2571,24 +2946,22 @@ class DetailClientQuery(BaseModel):
         """Arguments for DetailClient"""
 
         id: ID
-        model_config = ConfigDict(populate_by_name=True)
 
     class Meta:
         """Meta class for DetailClient"""
 
-        document = "fragment ListUser on User {\n  username\n  firstName\n  lastName\n  email\n  avatar\n  id\n  __typename\n}\n\nfragment ListApp on App {\n  id\n  identifier\n  logo {\n    presignedUrl\n    __typename\n  }\n  __typename\n}\n\nfragment ListClient on Client {\n  id\n  user {\n    id\n    username\n    __typename\n  }\n  name\n  kind\n  release {\n    version\n    logo {\n      presignedUrl\n      __typename\n    }\n    app {\n      id\n      identifier\n      logo {\n        presignedUrl\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment ListServiceInstance on ServiceInstance {\n  id\n  instanceId\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  __typename\n}\n\nfragment ListRelease on Release {\n  id\n  version\n  logo {\n    presignedUrl\n    __typename\n  }\n  app {\n    ...ListApp\n    __typename\n  }\n  __typename\n}\n\nfragment ListServiceInstanceMapping on ServiceInstanceMapping {\n  id\n  key\n  instance {\n    ...ListServiceInstance\n    __typename\n  }\n  client {\n    ...ListClient\n    __typename\n  }\n  optional\n  __typename\n}\n\nfragment DetailClient on Client {\n  id\n  token\n  name\n  user {\n    id\n    username\n    __typename\n  }\n  kind\n  release {\n    ...ListRelease\n    __typename\n  }\n  logo {\n    presignedUrl\n    __typename\n  }\n  oauth2Client {\n    clientId\n    __typename\n  }\n  mappings {\n    ...ListServiceInstanceMapping\n    __typename\n  }\n  issueUrl\n  __typename\n}\n\nquery DetailClient($id: ID!) {\n  client(id: $id) {\n    ...DetailClient\n    __typename\n  }\n}"
+        document = "fragment ListUser on User {\n  username\n  firstName\n  lastName\n  email\n  avatar\n  id\n  __typename\n}\n\nfragment ListApp on App {\n  id\n  identifier\n  logo {\n    presignedUrl\n    __typename\n  }\n  __typename\n}\n\nfragment ListClient on Client {\n  id\n  user {\n    id\n    username\n    __typename\n  }\n  name\n  kind\n  release {\n    version\n    logo {\n      presignedUrl\n      __typename\n    }\n    app {\n      id\n      identifier\n      logo {\n        presignedUrl\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment ListServiceInstance on ServiceInstance {\n  id\n  instanceId\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  __typename\n}\n\nfragment ListRelease on Release {\n  id\n  version\n  logo {\n    presignedUrl\n    __typename\n  }\n  app {\n    ...ListApp\n    __typename\n  }\n  __typename\n}\n\nfragment ListServiceInstanceMapping on ServiceInstanceMapping {\n  id\n  key\n  instance {\n    ...ListServiceInstance\n    __typename\n  }\n  client {\n    ...ListClient\n    __typename\n  }\n  optional\n  __typename\n}\n\nfragment DetailClient on Client {\n  id\n  name\n  clientId\n  user {\n    id\n    username\n    __typename\n  }\n  kind\n  release {\n    ...ListRelease\n    __typename\n  }\n  logo {\n    presignedUrl\n    __typename\n  }\n  mappings {\n    ...ListServiceInstanceMapping\n    __typename\n  }\n  issueUrl\n  __typename\n}\n\nquery DetailClient($id: ID!) {\n  client(id: $id) {\n    ...DetailClient\n    __typename\n  }\n}"
 
 
 class MyManagedClientsQuery(BaseModel):
     """No documentation found for this operation."""
 
-    my_managed_clients: ListClient = Field(alias="myManagedClients")
+    my_managed_clients: tuple[ListClient, ...] = Field(alias="myManagedClients")
 
     class Arguments(BaseModel):
         """Arguments for MyManagedClients"""
 
         kind: ClientKind
-        model_config = ConfigDict(populate_by_name=True)
 
     class Meta:
         """Meta class for MyManagedClients"""
@@ -2604,26 +2977,27 @@ class ClientQuery(BaseModel):
     class Arguments(BaseModel):
         """Arguments for Client"""
 
-        client_id: ID = Field(alias="clientId")
-        model_config = ConfigDict(populate_by_name=True)
+        client_id: ID = Field(
+            validation_alias=AliasChoices("client_id", "clientId"),
+            serialization_alias="clientId",
+        )
 
     class Meta:
         """Meta class for Client"""
 
-        document = "fragment ListUser on User {\n  username\n  firstName\n  lastName\n  email\n  avatar\n  id\n  __typename\n}\n\nfragment ListApp on App {\n  id\n  identifier\n  logo {\n    presignedUrl\n    __typename\n  }\n  __typename\n}\n\nfragment ListClient on Client {\n  id\n  user {\n    id\n    username\n    __typename\n  }\n  name\n  kind\n  release {\n    version\n    logo {\n      presignedUrl\n      __typename\n    }\n    app {\n      id\n      identifier\n      logo {\n        presignedUrl\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment ListServiceInstance on ServiceInstance {\n  id\n  instanceId\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  __typename\n}\n\nfragment ListRelease on Release {\n  id\n  version\n  logo {\n    presignedUrl\n    __typename\n  }\n  app {\n    ...ListApp\n    __typename\n  }\n  __typename\n}\n\nfragment ListServiceInstanceMapping on ServiceInstanceMapping {\n  id\n  key\n  instance {\n    ...ListServiceInstance\n    __typename\n  }\n  client {\n    ...ListClient\n    __typename\n  }\n  optional\n  __typename\n}\n\nfragment DetailClient on Client {\n  id\n  token\n  name\n  user {\n    id\n    username\n    __typename\n  }\n  kind\n  release {\n    ...ListRelease\n    __typename\n  }\n  logo {\n    presignedUrl\n    __typename\n  }\n  oauth2Client {\n    clientId\n    __typename\n  }\n  mappings {\n    ...ListServiceInstanceMapping\n    __typename\n  }\n  issueUrl\n  __typename\n}\n\nquery Client($clientId: ID!) {\n  client(clientId: $clientId) {\n    ...DetailClient\n    __typename\n  }\n}"
+        document = "fragment ListUser on User {\n  username\n  firstName\n  lastName\n  email\n  avatar\n  id\n  __typename\n}\n\nfragment ListApp on App {\n  id\n  identifier\n  logo {\n    presignedUrl\n    __typename\n  }\n  __typename\n}\n\nfragment ListClient on Client {\n  id\n  user {\n    id\n    username\n    __typename\n  }\n  name\n  kind\n  release {\n    version\n    logo {\n      presignedUrl\n      __typename\n    }\n    app {\n      id\n      identifier\n      logo {\n        presignedUrl\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment ListServiceInstance on ServiceInstance {\n  id\n  instanceId\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  __typename\n}\n\nfragment ListRelease on Release {\n  id\n  version\n  logo {\n    presignedUrl\n    __typename\n  }\n  app {\n    ...ListApp\n    __typename\n  }\n  __typename\n}\n\nfragment ListServiceInstanceMapping on ServiceInstanceMapping {\n  id\n  key\n  instance {\n    ...ListServiceInstance\n    __typename\n  }\n  client {\n    ...ListClient\n    __typename\n  }\n  optional\n  __typename\n}\n\nfragment DetailClient on Client {\n  id\n  name\n  clientId\n  user {\n    id\n    username\n    __typename\n  }\n  kind\n  release {\n    ...ListRelease\n    __typename\n  }\n  logo {\n    presignedUrl\n    __typename\n  }\n  mappings {\n    ...ListServiceInstanceMapping\n    __typename\n  }\n  issueUrl\n  __typename\n}\n\nquery Client($clientId: ID!) {\n  client(clientId: $clientId) {\n    ...DetailClient\n    __typename\n  }\n}"
 
 
 class CommentsForQuery(BaseModel):
     """No documentation found for this operation."""
 
-    comments_for: Tuple[ListComment, ...] = Field(alias="commentsFor")
+    comments_for: tuple[ListComment, ...] = Field(alias="commentsFor")
 
     class Arguments(BaseModel):
         """Arguments for CommentsFor"""
 
         object: ID
         identifier: str
-        model_config = ConfigDict(populate_by_name=True)
 
     class Meta:
         """Meta class for CommentsFor"""
@@ -2634,12 +3008,12 @@ class CommentsForQuery(BaseModel):
 class MyMentionsQuery(BaseModel):
     """No documentation found for this operation."""
 
-    my_mentions: Tuple[MentionComment, ...] = Field(alias="myMentions")
+    my_mentions: tuple[MentionComment, ...] = Field(alias="myMentions")
 
     class Arguments(BaseModel):
         """Arguments for MyMentions"""
 
-        model_config = ConfigDict(populate_by_name=True)
+        pass
 
     class Meta:
         """Meta class for MyMentions"""
@@ -2656,7 +3030,6 @@ class DetailCommentQuery(BaseModel):
         """Arguments for DetailComment"""
 
         id: ID
-        model_config = ConfigDict(populate_by_name=True)
 
     class Meta:
         """Meta class for DetailComment"""
@@ -2681,14 +3054,13 @@ class GroupOptionsQueryOptions(BaseModel):
 class GroupOptionsQuery(BaseModel):
     """No documentation found for this operation."""
 
-    options: Tuple[GroupOptionsQueryOptions, ...]
+    options: tuple[GroupOptionsQueryOptions, ...]
 
     class Arguments(BaseModel):
         """Arguments for GroupOptions"""
 
-        search: Optional[str] = Field(default=None)
-        values: Optional[List[ID]] = Field(default=None)
-        model_config = ConfigDict(populate_by_name=True)
+        search: str | None = Field(default=None)
+        values: list[ID] | None = Field(default=None)
 
     class Meta:
         """Meta class for GroupOptions"""
@@ -2705,7 +3077,6 @@ class DetailGroupQuery(BaseModel):
         """Arguments for DetailGroup"""
 
         id: ID
-        model_config = ConfigDict(populate_by_name=True)
 
     class Meta:
         """Meta class for DetailGroup"""
@@ -2716,14 +3087,13 @@ class DetailGroupQuery(BaseModel):
 class GroupsQuery(BaseModel):
     """No documentation found for this operation."""
 
-    groups: Tuple[ListGroup, ...]
+    groups: tuple[ListGroup, ...]
 
     class Arguments(BaseModel):
         """Arguments for Groups"""
 
-        filters: Optional[GroupFilter] = Field(default=None)
-        pagination: Optional[OffsetPaginationInput] = Field(default=None)
-        model_config = ConfigDict(populate_by_name=True)
+        filters: GroupFilter | None = Field(default=None)
+        pagination: OffsetPaginationInput | None = Field(default=None)
 
     class Meta:
         """Meta class for Groups"""
@@ -2734,14 +3104,13 @@ class GroupsQuery(BaseModel):
 class LayersQuery(BaseModel):
     """No documentation found for this operation."""
 
-    layers: Tuple[ListLayer, ...]
+    layers: tuple[ListLayer, ...]
 
     class Arguments(BaseModel):
         """Arguments for Layers"""
 
-        filters: Optional[LayerFilter] = Field(default=None)
-        pagination: Optional[OffsetPaginationInput] = Field(default=None)
-        model_config = ConfigDict(populate_by_name=True)
+        filters: LayerFilter | None = Field(default=None)
+        pagination: OffsetPaginationInput | None = Field(default=None)
 
     class Meta:
         """Meta class for Layers"""
@@ -2758,25 +3127,39 @@ class DetailLayerQuery(BaseModel):
         """Arguments for DetailLayer"""
 
         id: ID
-        model_config = ConfigDict(populate_by_name=True)
 
     class Meta:
         """Meta class for DetailLayer"""
 
-        document = "fragment ListUser on User {\n  username\n  firstName\n  lastName\n  email\n  avatar\n  id\n  __typename\n}\n\nfragment ListServiceInstance on ServiceInstance {\n  id\n  instanceId\n  allowedUsers {\n    ...ListUser\n    __typename\n  }\n  deniedUsers {\n    ...ListUser\n    __typename\n  }\n  __typename\n}\n\nfragment Layer on Layer {\n  id\n  name\n  description\n  logo {\n    presignedUrl\n    __typename\n  }\n  instances {\n    ...ListServiceInstance\n    __typename\n  }\n  __typename\n}\n\nquery DetailLayer($id: ID!) {\n  layer(id: $id) {\n    ...Layer\n    __typename\n  }\n}"
+        document = "fragment Layer on Layer {\n  id\n  name\n  identifier\n  description\n  logo {\n    presignedUrl\n    __typename\n  }\n  __typename\n}\n\nquery DetailLayer($id: ID!) {\n  layer(id: $id) {\n    ...Layer\n    __typename\n  }\n}"
+
+
+class RedeemTokenQuery(BaseModel):
+    """No documentation found for this operation."""
+
+    redeem_token: DetailRedeemToken = Field(alias="redeemToken")
+
+    class Arguments(BaseModel):
+        """Arguments for RedeemToken"""
+
+        id: ID
+
+    class Meta:
+        """Meta class for RedeemToken"""
+
+        document = "fragment DetailRedeemToken on RedeemToken {\n  id\n  token\n  expiresAt\n  maxRedemptions\n  redemptionCount\n  pinnedManifest\n  user {\n    id\n    email\n    __typename\n  }\n  client {\n    id\n    clientId\n    release {\n      version\n      app {\n        identifier\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nquery RedeemToken($id: ID!) {\n  redeemToken(id: $id) {\n    ...DetailRedeemToken\n    __typename\n  }\n}"
 
 
 class RedeemTokensQuery(BaseModel):
     """No documentation found for this operation."""
 
-    redeem_tokens: Tuple[ListRedeemToken, ...] = Field(alias="redeemTokens")
+    redeem_tokens: tuple[ListRedeemToken, ...] = Field(alias="redeemTokens")
 
     class Arguments(BaseModel):
         """Arguments for RedeemTokens"""
 
-        filters: Optional[RedeemTokenFilter] = Field(default=None)
-        pagination: Optional[OffsetPaginationInput] = Field(default=None)
-        model_config = ConfigDict(populate_by_name=True)
+        filters: RedeemTokenFilter | None = Field(default=None)
+        pagination: OffsetPaginationInput | None = Field(default=None)
 
     class Meta:
         """Meta class for RedeemTokens"""
@@ -2787,12 +3170,12 @@ class RedeemTokensQuery(BaseModel):
 class ReleasesQuery(BaseModel):
     """No documentation found for this operation."""
 
-    releases: Tuple[ListRelease, ...]
+    releases: tuple[ListRelease, ...]
 
     class Arguments(BaseModel):
         """Arguments for Releases"""
 
-        model_config = ConfigDict(populate_by_name=True)
+        pass
 
     class Meta:
         """Meta class for Releases"""
@@ -2808,11 +3191,14 @@ class ReleaseQuery(BaseModel):
     class Arguments(BaseModel):
         """Arguments for Release"""
 
-        identifier: Optional[str] = Field(default=None)
-        version: Optional[str] = Field(default=None)
-        id: Optional[ID] = Field(default=None)
-        client_id: Optional[ID] = Field(alias="clientId", default=None)
-        model_config = ConfigDict(populate_by_name=True)
+        identifier: str | None = Field(default=None)
+        version: str | None = Field(default=None)
+        id: ID | None = Field(default=None)
+        client_id: ID | None = Field(
+            validation_alias=AliasChoices("client_id", "clientId"),
+            serialization_alias="clientId",
+            default=None,
+        )
 
     class Meta:
         """Meta class for Release"""
@@ -2829,7 +3215,6 @@ class DetailReleaseQuery(BaseModel):
         """Arguments for DetailRelease"""
 
         id: ID
-        model_config = ConfigDict(populate_by_name=True)
 
     class Meta:
         """Meta class for DetailRelease"""
@@ -2855,12 +3240,12 @@ class ScopesQueryScopes(BaseModel):
 class ScopesQuery(BaseModel):
     """No documentation found for this operation."""
 
-    scopes: Tuple[ScopesQueryScopes, ...]
+    scopes: tuple[ScopesQueryScopes, ...]
 
     class Arguments(BaseModel):
         """Arguments for Scopes"""
 
-        model_config = ConfigDict(populate_by_name=True)
+        pass
 
     class Meta:
         """Meta class for Scopes"""
@@ -2884,12 +3269,12 @@ class ScopesOptionsQueryOptions(BaseModel):
 class ScopesOptionsQuery(BaseModel):
     """No documentation found for this operation."""
 
-    options: Tuple[ScopesOptionsQueryOptions, ...]
+    options: tuple[ScopesOptionsQueryOptions, ...]
 
     class Arguments(BaseModel):
         """Arguments for ScopesOptions"""
 
-        model_config = ConfigDict(populate_by_name=True)
+        pass
 
     class Meta:
         """Meta class for ScopesOptions"""
@@ -2900,17 +3285,22 @@ class ScopesOptionsQuery(BaseModel):
 class GlobalSearchQuery(BaseModel):
     """No documentation found for this operation."""
 
-    users: Tuple[ListUser, ...]
-    groups: Tuple[ListGroup, ...]
+    users: tuple[ListUser, ...] | None = Field(default=None)
+    groups: tuple[ListGroup, ...] | None = Field(default=None)
 
     class Arguments(BaseModel):
         """Arguments for GlobalSearch"""
 
-        search: Optional[str] = Field(default=None)
-        no_users: bool = Field(alias="noUsers")
-        no_groups: bool = Field(alias="noGroups")
-        pagination: Optional[OffsetPaginationInput] = Field(default=None)
-        model_config = ConfigDict(populate_by_name=True)
+        search: str | None = Field(default=None)
+        no_users: bool = Field(
+            validation_alias=AliasChoices("no_users", "noUsers"),
+            serialization_alias="noUsers",
+        )
+        no_groups: bool = Field(
+            validation_alias=AliasChoices("no_groups", "noGroups"),
+            serialization_alias="noGroups",
+        )
+        pagination: OffsetPaginationInput | None = Field(default=None)
 
     class Meta:
         """Meta class for GlobalSearch"""
@@ -2921,14 +3311,13 @@ class GlobalSearchQuery(BaseModel):
 class ListServiceInstancesQuery(BaseModel):
     """No documentation found for this operation."""
 
-    service_instances: Tuple[ListServiceInstance, ...] = Field(alias="serviceInstances")
+    service_instances: tuple[ListServiceInstance, ...] = Field(alias="serviceInstances")
 
     class Arguments(BaseModel):
         """Arguments for ListServiceInstances"""
 
-        pagination: Optional[OffsetPaginationInput] = Field(default=None)
-        filters: Optional[ServiceInstanceFilter] = Field(default=None)
-        model_config = ConfigDict(populate_by_name=True)
+        pagination: OffsetPaginationInput | None = Field(default=None)
+        filters: ServiceInstanceFilter | None = Field(default=None)
 
     class Meta:
         """Meta class for ListServiceInstances"""
@@ -2945,7 +3334,6 @@ class GetServiceInstanceQuery(BaseModel):
         """Arguments for GetServiceInstance"""
 
         id: ID
-        model_config = ConfigDict(populate_by_name=True)
 
     class Meta:
         """Meta class for GetServiceInstance"""
@@ -2956,14 +3344,13 @@ class GetServiceInstanceQuery(BaseModel):
 class ListServiceReleasesQuery(BaseModel):
     """No documentation found for this operation."""
 
-    service_releases: Tuple[ListServiceRelease, ...] = Field(alias="serviceReleases")
+    service_releases: tuple[ListServiceRelease, ...] = Field(alias="serviceReleases")
 
     class Arguments(BaseModel):
         """Arguments for ListServiceReleases"""
 
-        pagination: Optional[OffsetPaginationInput] = Field(default=None)
-        filters: Optional[ServiceReleaseFilter] = Field(default=None)
-        model_config = ConfigDict(populate_by_name=True)
+        pagination: OffsetPaginationInput | None = Field(default=None)
+        filters: ServiceReleaseFilter | None = Field(default=None)
 
     class Meta:
         """Meta class for ListServiceReleases"""
@@ -2980,7 +3367,6 @@ class GetServiceReleaseQuery(BaseModel):
         """Arguments for GetServiceRelease"""
 
         id: ID
-        model_config = ConfigDict(populate_by_name=True)
 
     class Meta:
         """Meta class for GetServiceRelease"""
@@ -2991,14 +3377,13 @@ class GetServiceReleaseQuery(BaseModel):
 class ListServicesQuery(BaseModel):
     """No documentation found for this operation."""
 
-    services: Tuple[ListService, ...]
+    services: tuple[ListService, ...]
 
     class Arguments(BaseModel):
         """Arguments for ListServices"""
 
-        pagination: Optional[OffsetPaginationInput] = Field(default=None)
-        filters: Optional[ServiceFilter] = Field(default=None)
-        model_config = ConfigDict(populate_by_name=True)
+        pagination: OffsetPaginationInput | None = Field(default=None)
+        filters: ServiceFilter | None = Field(default=None)
 
     class Meta:
         """Meta class for ListServices"""
@@ -3015,7 +3400,6 @@ class GetServiceQuery(BaseModel):
         """Arguments for GetService"""
 
         id: ID
-        model_config = ConfigDict(populate_by_name=True)
 
     class Meta:
         """Meta class for GetService"""
@@ -3026,13 +3410,12 @@ class GetServiceQuery(BaseModel):
 class MyStashesQuery(BaseModel):
     """No documentation found for this operation."""
 
-    stashes: Tuple[ListStash, ...]
+    stashes: tuple[ListStash, ...]
 
     class Arguments(BaseModel):
         """Arguments for MyStashes"""
 
-        pagination: Optional[OffsetPaginationInput] = Field(default=None)
-        model_config = ConfigDict(populate_by_name=True)
+        pagination: OffsetPaginationInput | None = Field(default=None)
 
     class Meta:
         """Meta class for MyStashes"""
@@ -3048,7 +3431,7 @@ class MeQuery(BaseModel):
     class Arguments(BaseModel):
         """Arguments for Me"""
 
-        model_config = ConfigDict(populate_by_name=True)
+        pass
 
     class Meta:
         """Meta class for Me"""
@@ -3065,7 +3448,6 @@ class UserQuery(BaseModel):
         """Arguments for User"""
 
         id: ID
-        model_config = ConfigDict(populate_by_name=True)
 
     class Meta:
         """Meta class for User"""
@@ -3082,7 +3464,6 @@ class DetailUserQuery(BaseModel):
         """Arguments for DetailUser"""
 
         id: ID
-        model_config = ConfigDict(populate_by_name=True)
 
     class Meta:
         """Meta class for DetailUser"""
@@ -3093,14 +3474,13 @@ class DetailUserQuery(BaseModel):
 class UsersQuery(BaseModel):
     """No documentation found for this operation."""
 
-    users: Tuple[ListUser, ...]
+    users: tuple[ListUser, ...]
 
     class Arguments(BaseModel):
         """Arguments for Users"""
 
-        filters: Optional[UserFilter] = Field(default=None)
-        pagination: Optional[OffsetPaginationInput] = Field(default=None)
-        model_config = ConfigDict(populate_by_name=True)
+        filters: UserFilter | None = Field(default=None)
+        pagination: OffsetPaginationInput | None = Field(default=None)
 
     class Meta:
         """Meta class for Users"""
@@ -3131,14 +3511,13 @@ class UserOptionsQueryOptions(BaseModel):
 class UserOptionsQuery(BaseModel):
     """No documentation found for this operation."""
 
-    options: Tuple[UserOptionsQueryOptions, ...]
+    options: tuple[UserOptionsQueryOptions, ...]
 
     class Arguments(BaseModel):
         """Arguments for UserOptions"""
 
-        search: Optional[str] = Field(default=None)
-        values: Optional[List[ID]] = Field(default=None)
-        model_config = ConfigDict(populate_by_name=True)
+        search: str | None = Field(default=None)
+        values: list[ID] | None = Field(default=None)
 
     class Meta:
         """Meta class for UserOptions"""
@@ -3154,7 +3533,7 @@ class ProfileQuery(BaseModel):
     class Arguments(BaseModel):
         """Arguments for Profile"""
 
-        model_config = ConfigDict(populate_by_name=True)
+        pass
 
     class Meta:
         """Meta class for Profile"""
@@ -3170,7 +3549,7 @@ class WatchMentionsSubscription(BaseModel):
     class Arguments(BaseModel):
         """Arguments for WatchMentions"""
 
-        model_config = ConfigDict(populate_by_name=True)
+        pass
 
     class Meta:
         """Meta class for WatchMentions"""
@@ -3180,68 +3559,80 @@ class WatchMentionsSubscription(BaseModel):
 
 async def acreate_client(
     manifest: ManifestInput,
-    composition: Optional[IDCoercible] = None,
-    layers: Optional[Iterable[str]] = ["web"],
-    rath: Optional[UnlokRath] = None,
+    hub: IDCoercible | None | UnsetType = UNSET,
+    layers: Iterable[str] | None | UnsetType = UNSET,
+    role: ClientRole | None | UnsetType = UNSET,
+    rath: UnlokRath | None = None,
 ) -> DetailClient:
     """CreateClient
 
 
     Args:
         manifest:  (required)
-        composition: The `ID` scalar type represents a unique identifier, often used to refetch an object or as key for a cache. The ID type appears in a JSON response as a String; however, it is not intended to be human-readable. When expected as an input type, any string (such as `"4"`) or integer (such as `4`) input value will be accepted as an ID.
+        hub: The `ID` scalar type represents a unique identifier, often used to refetch an object or as key for a cache. The ID type appears in a JSON response as a String; however, it is not intended to be human-readable. When expected as an input type, any string (such as `"4"`) or integer (such as `4`) input value will be accepted as an ID.
         layers: The `String` scalar type represents textual data, represented as UTF-8 character sequences. The String type is most often used by GraphQL to represent free-form human-readable text. (required) (list)
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        role: ClientRole
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
         DetailClient
     """
+    variables: dict[str, Any] = {}
+    _input: dict[str, Any] = {}
+    _input["manifest"] = manifest
+    if hub is not UNSET:
+        _input["hub"] = hub
+    if layers is not UNSET:
+        _input["layers"] = layers
+    if role is not UNSET:
+        _input["role"] = role
+    variables["input"] = _input
     return (
-        await aexecute(
-            CreateClientMutation,
-            {
-                "input": {
-                    "manifest": manifest,
-                    "composition": composition,
-                    "layers": layers,
-                }
-            },
-            rath=rath,
-        )
+        await aexecute(CreateClientMutation, variables, rath=rath)
     ).create_developmental_client
 
 
 def create_client(
     manifest: ManifestInput,
-    composition: Optional[IDCoercible] = None,
-    layers: Optional[Iterable[str]] = ["web"],
-    rath: Optional[UnlokRath] = None,
+    hub: IDCoercible | None | UnsetType = UNSET,
+    layers: Iterable[str] | None | UnsetType = UNSET,
+    role: ClientRole | None | UnsetType = UNSET,
+    rath: UnlokRath | None = None,
 ) -> DetailClient:
     """CreateClient
 
 
     Args:
         manifest:  (required)
-        composition: The `ID` scalar type represents a unique identifier, often used to refetch an object or as key for a cache. The ID type appears in a JSON response as a String; however, it is not intended to be human-readable. When expected as an input type, any string (such as `"4"`) or integer (such as `4`) input value will be accepted as an ID.
+        hub: The `ID` scalar type represents a unique identifier, often used to refetch an object or as key for a cache. The ID type appears in a JSON response as a String; however, it is not intended to be human-readable. When expected as an input type, any string (such as `"4"`) or integer (such as `4`) input value will be accepted as an ID.
         layers: The `String` scalar type represents textual data, represented as UTF-8 character sequences. The String type is most often used by GraphQL to represent free-form human-readable text. (required) (list)
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        role: ClientRole
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
         DetailClient
     """
+    variables: dict[str, Any] = {}
+    _input: dict[str, Any] = {}
+    _input["manifest"] = manifest
+    if hub is not UNSET:
+        _input["hub"] = hub
+    if layers is not UNSET:
+        _input["layers"] = layers
+    if role is not UNSET:
+        _input["role"] = role
+    variables["input"] = _input
     return execute(
-        CreateClientMutation,
-        {"input": {"manifest": manifest, "composition": composition, "layers": layers}},
-        rath=rath,
+        CreateClientMutation, variables, rath=rath
     ).create_developmental_client
 
 
 async def acreate_comment(
-    object: ID,
+    object: IDCoercible,
     identifier: str,
-    descendants: List[DescendantInput],
-    parent: Optional[ID] = None,
-    rath: Optional[UnlokRath] = None,
+    descendants: list[DescendantInput],
+    parent: IDCoercible | None | UnsetType = UNSET,
+    rath: UnlokRath | None = None,
 ) -> ListComment:
     """CreateComment
 
@@ -3249,33 +3640,28 @@ async def acreate_comment(
     Args:
         object (ID): No description
         identifier (str): No description
-        descendants (List[DescendantInput]): No description
-        parent (Optional[ID], optional): No description.
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        descendants (list[DescendantInput]): No description
+        parent (ID | None, optional): No description.
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
         ListComment
     """
-    return (
-        await aexecute(
-            CreateCommentMutation,
-            {
-                "object": object,
-                "identifier": identifier,
-                "descendants": descendants,
-                "parent": parent,
-            },
-            rath=rath,
-        )
-    ).create_comment
+    variables: dict[str, Any] = {}
+    variables["object"] = object
+    variables["identifier"] = identifier
+    variables["descendants"] = descendants
+    if parent is not UNSET:
+        variables["parent"] = parent
+    return (await aexecute(CreateCommentMutation, variables, rath=rath)).create_comment
 
 
 def create_comment(
-    object: ID,
+    object: IDCoercible,
     identifier: str,
-    descendants: List[DescendantInput],
-    parent: Optional[ID] = None,
-    rath: Optional[UnlokRath] = None,
+    descendants: list[DescendantInput],
+    parent: IDCoercible | None | UnsetType = UNSET,
+    rath: UnlokRath | None = None,
 ) -> ListComment:
     """CreateComment
 
@@ -3283,97 +3669,104 @@ def create_comment(
     Args:
         object (ID): No description
         identifier (str): No description
-        descendants (List[DescendantInput]): No description
-        parent (Optional[ID], optional): No description.
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        descendants (list[DescendantInput]): No description
+        parent (ID | None, optional): No description.
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
         ListComment
     """
-    return execute(
-        CreateCommentMutation,
-        {
-            "object": object,
-            "identifier": identifier,
-            "descendants": descendants,
-            "parent": parent,
-        },
-        rath=rath,
-    ).create_comment
+    variables: dict[str, Any] = {}
+    variables["object"] = object
+    variables["identifier"] = identifier
+    variables["descendants"] = descendants
+    if parent is not UNSET:
+        variables["parent"] = parent
+    return execute(CreateCommentMutation, variables, rath=rath).create_comment
 
 
 async def areply_to(
-    descendants: List[DescendantInput], parent: ID, rath: Optional[UnlokRath] = None
+    descendants: list[DescendantInput],
+    parent: IDCoercible,
+    rath: UnlokRath | None = None,
 ) -> ListComment:
     """ReplyTo
 
 
     Args:
-        descendants (List[DescendantInput]): No description
+        descendants (list[DescendantInput]): No description
         parent (ID): No description
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
         ListComment
     """
-    return (
-        await aexecute(
-            ReplyToMutation, {"descendants": descendants, "parent": parent}, rath=rath
-        )
-    ).reply_to
+    variables: dict[str, Any] = {}
+    variables["descendants"] = descendants
+    variables["parent"] = parent
+    return (await aexecute(ReplyToMutation, variables, rath=rath)).reply_to
 
 
 def reply_to(
-    descendants: List[DescendantInput], parent: ID, rath: Optional[UnlokRath] = None
+    descendants: list[DescendantInput],
+    parent: IDCoercible,
+    rath: UnlokRath | None = None,
 ) -> ListComment:
     """ReplyTo
 
 
     Args:
-        descendants (List[DescendantInput]): No description
+        descendants (list[DescendantInput]): No description
         parent (ID): No description
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
         ListComment
     """
-    return execute(
-        ReplyToMutation, {"descendants": descendants, "parent": parent}, rath=rath
-    ).reply_to
+    variables: dict[str, Any] = {}
+    variables["descendants"] = descendants
+    variables["parent"] = parent
+    return execute(ReplyToMutation, variables, rath=rath).reply_to
 
 
-async def aresolve_comment(id: ID, rath: Optional[UnlokRath] = None) -> ListComment:
+async def aresolve_comment(
+    id: IDCoercible, rath: UnlokRath | None = None
+) -> ListComment:
     """ResolveComment
 
 
     Args:
         id (ID): No description
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
         ListComment
     """
+    variables: dict[str, Any] = {}
+    variables["id"] = id
     return (
-        await aexecute(ResolveCommentMutation, {"id": id}, rath=rath)
+        await aexecute(ResolveCommentMutation, variables, rath=rath)
     ).resolve_comment
 
 
-def resolve_comment(id: ID, rath: Optional[UnlokRath] = None) -> ListComment:
+def resolve_comment(id: IDCoercible, rath: UnlokRath | None = None) -> ListComment:
     """ResolveComment
 
 
     Args:
         id (ID): No description
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
         ListComment
     """
-    return execute(ResolveCommentMutation, {"id": id}, rath=rath).resolve_comment
+    variables: dict[str, Any] = {}
+    variables["id"] = id
+    return execute(ResolveCommentMutation, variables, rath=rath).resolve_comment
 
 
 async def acreate_group_profile(
-    group: IDCoercible, name: str, avatar: IDCoercible, rath: Optional[UnlokRath] = None
+    group: IDCoercible, name: str, avatar: IDCoercible, rath: UnlokRath | None = None
 ) -> GroupProfile:
     """CreateGroupProfile
 
@@ -3382,22 +3775,24 @@ async def acreate_group_profile(
         group: The `ID` scalar type represents a unique identifier, often used to refetch an object or as key for a cache. The ID type appears in a JSON response as a String; however, it is not intended to be human-readable. When expected as an input type, any string (such as `"4"`) or integer (such as `4`) input value will be accepted as an ID. (required)
         name: The `String` scalar type represents textual data, represented as UTF-8 character sequences. The String type is most often used by GraphQL to represent free-form human-readable text. (required)
         avatar: The `ID` scalar type represents a unique identifier, often used to refetch an object or as key for a cache. The ID type appears in a JSON response as a String; however, it is not intended to be human-readable. When expected as an input type, any string (such as `"4"`) or integer (such as `4`) input value will be accepted as an ID. (required)
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
         GroupProfile
     """
+    variables: dict[str, Any] = {}
+    _input: dict[str, Any] = {}
+    _input["group"] = group
+    _input["name"] = name
+    _input["avatar"] = avatar
+    variables["input"] = _input
     return (
-        await aexecute(
-            CreateGroupProfileMutation,
-            {"input": {"group": group, "name": name, "avatar": avatar}},
-            rath=rath,
-        )
+        await aexecute(CreateGroupProfileMutation, variables, rath=rath)
     ).create_group_profile
 
 
 def create_group_profile(
-    group: IDCoercible, name: str, avatar: IDCoercible, rath: Optional[UnlokRath] = None
+    group: IDCoercible, name: str, avatar: IDCoercible, rath: UnlokRath | None = None
 ) -> GroupProfile:
     """CreateGroupProfile
 
@@ -3406,20 +3801,24 @@ def create_group_profile(
         group: The `ID` scalar type represents a unique identifier, often used to refetch an object or as key for a cache. The ID type appears in a JSON response as a String; however, it is not intended to be human-readable. When expected as an input type, any string (such as `"4"`) or integer (such as `4`) input value will be accepted as an ID. (required)
         name: The `String` scalar type represents textual data, represented as UTF-8 character sequences. The String type is most often used by GraphQL to represent free-form human-readable text. (required)
         avatar: The `ID` scalar type represents a unique identifier, often used to refetch an object or as key for a cache. The ID type appears in a JSON response as a String; however, it is not intended to be human-readable. When expected as an input type, any string (such as `"4"`) or integer (such as `4`) input value will be accepted as an ID. (required)
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
         GroupProfile
     """
+    variables: dict[str, Any] = {}
+    _input: dict[str, Any] = {}
+    _input["group"] = group
+    _input["name"] = name
+    _input["avatar"] = avatar
+    variables["input"] = _input
     return execute(
-        CreateGroupProfileMutation,
-        {"input": {"group": group, "name": name, "avatar": avatar}},
-        rath=rath,
+        CreateGroupProfileMutation, variables, rath=rath
     ).create_group_profile
 
 
 async def aupdate_group_profile(
-    id: IDCoercible, name: str, avatar: IDCoercible, rath: Optional[UnlokRath] = None
+    id: IDCoercible, name: str, avatar: IDCoercible, rath: UnlokRath | None = None
 ) -> GroupProfile:
     """UpdateGroupProfile
 
@@ -3428,22 +3827,24 @@ async def aupdate_group_profile(
         id: The `ID` scalar type represents a unique identifier, often used to refetch an object or as key for a cache. The ID type appears in a JSON response as a String; however, it is not intended to be human-readable. When expected as an input type, any string (such as `"4"`) or integer (such as `4`) input value will be accepted as an ID. (required)
         name: The `String` scalar type represents textual data, represented as UTF-8 character sequences. The String type is most often used by GraphQL to represent free-form human-readable text. (required)
         avatar: The `ID` scalar type represents a unique identifier, often used to refetch an object or as key for a cache. The ID type appears in a JSON response as a String; however, it is not intended to be human-readable. When expected as an input type, any string (such as `"4"`) or integer (such as `4`) input value will be accepted as an ID. (required)
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
         GroupProfile
     """
+    variables: dict[str, Any] = {}
+    _input: dict[str, Any] = {}
+    _input["id"] = id
+    _input["name"] = name
+    _input["avatar"] = avatar
+    variables["input"] = _input
     return (
-        await aexecute(
-            UpdateGroupProfileMutation,
-            {"input": {"id": id, "name": name, "avatar": avatar}},
-            rath=rath,
-        )
+        await aexecute(UpdateGroupProfileMutation, variables, rath=rath)
     ).update_group_profile
 
 
 def update_group_profile(
-    id: IDCoercible, name: str, avatar: IDCoercible, rath: Optional[UnlokRath] = None
+    id: IDCoercible, name: str, avatar: IDCoercible, rath: UnlokRath | None = None
 ) -> GroupProfile:
     """UpdateGroupProfile
 
@@ -3452,25 +3853,29 @@ def update_group_profile(
         id: The `ID` scalar type represents a unique identifier, often used to refetch an object or as key for a cache. The ID type appears in a JSON response as a String; however, it is not intended to be human-readable. When expected as an input type, any string (such as `"4"`) or integer (such as `4`) input value will be accepted as an ID. (required)
         name: The `String` scalar type represents textual data, represented as UTF-8 character sequences. The String type is most often used by GraphQL to represent free-form human-readable text. (required)
         avatar: The `ID` scalar type represents a unique identifier, often used to refetch an object or as key for a cache. The ID type appears in a JSON response as a String; however, it is not intended to be human-readable. When expected as an input type, any string (such as `"4"`) or integer (such as `4`) input value will be accepted as an ID. (required)
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
         GroupProfile
     """
+    variables: dict[str, Any] = {}
+    _input: dict[str, Any] = {}
+    _input["id"] = id
+    _input["name"] = name
+    _input["avatar"] = avatar
+    variables["input"] = _input
     return execute(
-        UpdateGroupProfileMutation,
-        {"input": {"id": id, "name": name, "avatar": avatar}},
-        rath=rath,
+        UpdateGroupProfileMutation, variables, rath=rath
     ).update_group_profile
 
 
 async def aupdate_service_instance(
     id: IDCoercible,
-    allowed_users: Optional[Iterable[IDCoercible]] = None,
-    allowed_groups: Optional[Iterable[IDCoercible]] = None,
-    denied_groups: Optional[Iterable[IDCoercible]] = None,
-    denied_users: Optional[Iterable[IDCoercible]] = None,
-    rath: Optional[UnlokRath] = None,
+    allowed_users: Iterable[IDCoercible] | None | UnsetType = UNSET,
+    allowed_groups: Iterable[IDCoercible] | None | UnsetType = UNSET,
+    denied_groups: Iterable[IDCoercible] | None | UnsetType = UNSET,
+    denied_users: Iterable[IDCoercible] | None | UnsetType = UNSET,
+    rath: UnlokRath | None = None,
 ) -> ServiceInstance:
     """UpdateServiceInstance
 
@@ -3481,35 +3886,35 @@ async def aupdate_service_instance(
         denied_groups: The `ID` scalar type represents a unique identifier, often used to refetch an object or as key for a cache. The ID type appears in a JSON response as a String; however, it is not intended to be human-readable. When expected as an input type, any string (such as `"4"`) or integer (such as `4`) input value will be accepted as an ID. (required) (list)
         denied_users: The `ID` scalar type represents a unique identifier, often used to refetch an object or as key for a cache. The ID type appears in a JSON response as a String; however, it is not intended to be human-readable. When expected as an input type, any string (such as `"4"`) or integer (such as `4`) input value will be accepted as an ID. (required) (list)
         id: The `ID` scalar type represents a unique identifier, often used to refetch an object or as key for a cache. The ID type appears in a JSON response as a String; however, it is not intended to be human-readable. When expected as an input type, any string (such as `"4"`) or integer (such as `4`) input value will be accepted as an ID. (required)
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
         ServiceInstance
     """
+    variables: dict[str, Any] = {}
+    _input: dict[str, Any] = {}
+    if allowed_users is not UNSET:
+        _input["allowedUsers"] = allowed_users
+    if allowed_groups is not UNSET:
+        _input["allowedGroups"] = allowed_groups
+    if denied_groups is not UNSET:
+        _input["deniedGroups"] = denied_groups
+    if denied_users is not UNSET:
+        _input["deniedUsers"] = denied_users
+    _input["id"] = id
+    variables["input"] = _input
     return (
-        await aexecute(
-            UpdateServiceInstanceMutation,
-            {
-                "input": {
-                    "allowedUsers": allowed_users,
-                    "allowedGroups": allowed_groups,
-                    "deniedGroups": denied_groups,
-                    "deniedUsers": denied_users,
-                    "id": id,
-                }
-            },
-            rath=rath,
-        )
+        await aexecute(UpdateServiceInstanceMutation, variables, rath=rath)
     ).update_service_instance
 
 
 def update_service_instance(
     id: IDCoercible,
-    allowed_users: Optional[Iterable[IDCoercible]] = None,
-    allowed_groups: Optional[Iterable[IDCoercible]] = None,
-    denied_groups: Optional[Iterable[IDCoercible]] = None,
-    denied_users: Optional[Iterable[IDCoercible]] = None,
-    rath: Optional[UnlokRath] = None,
+    allowed_users: Iterable[IDCoercible] | None | UnsetType = UNSET,
+    allowed_groups: Iterable[IDCoercible] | None | UnsetType = UNSET,
+    denied_groups: Iterable[IDCoercible] | None | UnsetType = UNSET,
+    denied_users: Iterable[IDCoercible] | None | UnsetType = UNSET,
+    rath: UnlokRath | None = None,
 ) -> ServiceInstance:
     """UpdateServiceInstance
 
@@ -3520,34 +3925,36 @@ def update_service_instance(
         denied_groups: The `ID` scalar type represents a unique identifier, often used to refetch an object or as key for a cache. The ID type appears in a JSON response as a String; however, it is not intended to be human-readable. When expected as an input type, any string (such as `"4"`) or integer (such as `4`) input value will be accepted as an ID. (required) (list)
         denied_users: The `ID` scalar type represents a unique identifier, often used to refetch an object or as key for a cache. The ID type appears in a JSON response as a String; however, it is not intended to be human-readable. When expected as an input type, any string (such as `"4"`) or integer (such as `4`) input value will be accepted as an ID. (required) (list)
         id: The `ID` scalar type represents a unique identifier, often used to refetch an object or as key for a cache. The ID type appears in a JSON response as a String; however, it is not intended to be human-readable. When expected as an input type, any string (such as `"4"`) or integer (such as `4`) input value will be accepted as an ID. (required)
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
         ServiceInstance
     """
+    variables: dict[str, Any] = {}
+    _input: dict[str, Any] = {}
+    if allowed_users is not UNSET:
+        _input["allowedUsers"] = allowed_users
+    if allowed_groups is not UNSET:
+        _input["allowedGroups"] = allowed_groups
+    if denied_groups is not UNSET:
+        _input["deniedGroups"] = denied_groups
+    if denied_users is not UNSET:
+        _input["deniedUsers"] = denied_users
+    _input["id"] = id
+    variables["input"] = _input
     return execute(
-        UpdateServiceInstanceMutation,
-        {
-            "input": {
-                "allowedUsers": allowed_users,
-                "allowedGroups": allowed_groups,
-                "deniedGroups": denied_groups,
-                "deniedUsers": denied_users,
-                "id": id,
-            }
-        },
-        rath=rath,
+        UpdateServiceInstanceMutation, variables, rath=rath
     ).update_service_instance
 
 
 async def acreate_service_instance(
     identifier: str,
     service: IDCoercible,
-    allowed_users: Optional[Iterable[IDCoercible]] = None,
-    allowed_groups: Optional[Iterable[IDCoercible]] = None,
-    denied_groups: Optional[Iterable[IDCoercible]] = None,
-    denied_users: Optional[Iterable[IDCoercible]] = None,
-    rath: Optional[UnlokRath] = None,
+    allowed_users: Iterable[IDCoercible] | None | UnsetType = UNSET,
+    allowed_groups: Iterable[IDCoercible] | None | UnsetType = UNSET,
+    denied_groups: Iterable[IDCoercible] | None | UnsetType = UNSET,
+    denied_users: Iterable[IDCoercible] | None | UnsetType = UNSET,
+    rath: UnlokRath | None = None,
 ) -> ServiceInstance:
     """CreateServiceInstance
 
@@ -3559,37 +3966,37 @@ async def acreate_service_instance(
         allowed_groups: The `ID` scalar type represents a unique identifier, often used to refetch an object or as key for a cache. The ID type appears in a JSON response as a String; however, it is not intended to be human-readable. When expected as an input type, any string (such as `"4"`) or integer (such as `4`) input value will be accepted as an ID. (required) (list)
         denied_groups: The `ID` scalar type represents a unique identifier, often used to refetch an object or as key for a cache. The ID type appears in a JSON response as a String; however, it is not intended to be human-readable. When expected as an input type, any string (such as `"4"`) or integer (such as `4`) input value will be accepted as an ID. (required) (list)
         denied_users: The `ID` scalar type represents a unique identifier, often used to refetch an object or as key for a cache. The ID type appears in a JSON response as a String; however, it is not intended to be human-readable. When expected as an input type, any string (such as `"4"`) or integer (such as `4`) input value will be accepted as an ID. (required) (list)
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
         ServiceInstance
     """
+    variables: dict[str, Any] = {}
+    _input: dict[str, Any] = {}
+    _input["identifier"] = identifier
+    _input["service"] = service
+    if allowed_users is not UNSET:
+        _input["allowedUsers"] = allowed_users
+    if allowed_groups is not UNSET:
+        _input["allowedGroups"] = allowed_groups
+    if denied_groups is not UNSET:
+        _input["deniedGroups"] = denied_groups
+    if denied_users is not UNSET:
+        _input["deniedUsers"] = denied_users
+    variables["input"] = _input
     return (
-        await aexecute(
-            CreateServiceInstanceMutation,
-            {
-                "input": {
-                    "identifier": identifier,
-                    "service": service,
-                    "allowedUsers": allowed_users,
-                    "allowedGroups": allowed_groups,
-                    "deniedGroups": denied_groups,
-                    "deniedUsers": denied_users,
-                }
-            },
-            rath=rath,
-        )
+        await aexecute(CreateServiceInstanceMutation, variables, rath=rath)
     ).create_service_instance
 
 
 def create_service_instance(
     identifier: str,
     service: IDCoercible,
-    allowed_users: Optional[Iterable[IDCoercible]] = None,
-    allowed_groups: Optional[Iterable[IDCoercible]] = None,
-    denied_groups: Optional[Iterable[IDCoercible]] = None,
-    denied_users: Optional[Iterable[IDCoercible]] = None,
-    rath: Optional[UnlokRath] = None,
+    allowed_users: Iterable[IDCoercible] | None | UnsetType = UNSET,
+    allowed_groups: Iterable[IDCoercible] | None | UnsetType = UNSET,
+    denied_groups: Iterable[IDCoercible] | None | UnsetType = UNSET,
+    denied_users: Iterable[IDCoercible] | None | UnsetType = UNSET,
+    rath: UnlokRath | None = None,
 ) -> ServiceInstance:
     """CreateServiceInstance
 
@@ -3601,29 +4008,31 @@ def create_service_instance(
         allowed_groups: The `ID` scalar type represents a unique identifier, often used to refetch an object or as key for a cache. The ID type appears in a JSON response as a String; however, it is not intended to be human-readable. When expected as an input type, any string (such as `"4"`) or integer (such as `4`) input value will be accepted as an ID. (required) (list)
         denied_groups: The `ID` scalar type represents a unique identifier, often used to refetch an object or as key for a cache. The ID type appears in a JSON response as a String; however, it is not intended to be human-readable. When expected as an input type, any string (such as `"4"`) or integer (such as `4`) input value will be accepted as an ID. (required) (list)
         denied_users: The `ID` scalar type represents a unique identifier, often used to refetch an object or as key for a cache. The ID type appears in a JSON response as a String; however, it is not intended to be human-readable. When expected as an input type, any string (such as `"4"`) or integer (such as `4`) input value will be accepted as an ID. (required) (list)
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
         ServiceInstance
     """
+    variables: dict[str, Any] = {}
+    _input: dict[str, Any] = {}
+    _input["identifier"] = identifier
+    _input["service"] = service
+    if allowed_users is not UNSET:
+        _input["allowedUsers"] = allowed_users
+    if allowed_groups is not UNSET:
+        _input["allowedGroups"] = allowed_groups
+    if denied_groups is not UNSET:
+        _input["deniedGroups"] = denied_groups
+    if denied_users is not UNSET:
+        _input["deniedUsers"] = denied_users
+    variables["input"] = _input
     return execute(
-        CreateServiceInstanceMutation,
-        {
-            "input": {
-                "identifier": identifier,
-                "service": service,
-                "allowedUsers": allowed_users,
-                "allowedGroups": allowed_groups,
-                "deniedGroups": denied_groups,
-                "deniedUsers": denied_users,
-            }
-        },
-        rath=rath,
+        CreateServiceInstanceMutation, variables, rath=rath
     ).create_service_instance
 
 
 async def acreate_user_profile(
-    user: IDCoercible, name: str, rath: Optional[UnlokRath] = None
+    user: IDCoercible, name: str, rath: UnlokRath | None = None
 ) -> Profile:
     """CreateUserProfile
 
@@ -3631,22 +4040,23 @@ async def acreate_user_profile(
     Args:
         user: The `ID` scalar type represents a unique identifier, often used to refetch an object or as key for a cache. The ID type appears in a JSON response as a String; however, it is not intended to be human-readable. When expected as an input type, any string (such as `"4"`) or integer (such as `4`) input value will be accepted as an ID. (required)
         name: The `String` scalar type represents textual data, represented as UTF-8 character sequences. The String type is most often used by GraphQL to represent free-form human-readable text. (required)
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
         Profile
     """
+    variables: dict[str, Any] = {}
+    _input: dict[str, Any] = {}
+    _input["user"] = user
+    _input["name"] = name
+    variables["input"] = _input
     return (
-        await aexecute(
-            CreateUserProfileMutation,
-            {"input": {"user": user, "name": name}},
-            rath=rath,
-        )
+        await aexecute(CreateUserProfileMutation, variables, rath=rath)
     ).create_profile
 
 
 def create_user_profile(
-    user: IDCoercible, name: str, rath: Optional[UnlokRath] = None
+    user: IDCoercible, name: str, rath: UnlokRath | None = None
 ) -> Profile:
     """CreateUserProfile
 
@@ -3654,18 +4064,21 @@ def create_user_profile(
     Args:
         user: The `ID` scalar type represents a unique identifier, often used to refetch an object or as key for a cache. The ID type appears in a JSON response as a String; however, it is not intended to be human-readable. When expected as an input type, any string (such as `"4"`) or integer (such as `4`) input value will be accepted as an ID. (required)
         name: The `String` scalar type represents textual data, represented as UTF-8 character sequences. The String type is most often used by GraphQL to represent free-form human-readable text. (required)
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
         Profile
     """
-    return execute(
-        CreateUserProfileMutation, {"input": {"user": user, "name": name}}, rath=rath
-    ).create_profile
+    variables: dict[str, Any] = {}
+    _input: dict[str, Any] = {}
+    _input["user"] = user
+    _input["name"] = name
+    variables["input"] = _input
+    return execute(CreateUserProfileMutation, variables, rath=rath).create_profile
 
 
 async def aupdate_user_profile(
-    id: IDCoercible, name: str, avatar: IDCoercible, rath: Optional[UnlokRath] = None
+    id: IDCoercible, name: str, avatar: IDCoercible, rath: UnlokRath | None = None
 ) -> Profile:
     """UpdateUserProfile
 
@@ -3674,22 +4087,24 @@ async def aupdate_user_profile(
         id: The `ID` scalar type represents a unique identifier, often used to refetch an object or as key for a cache. The ID type appears in a JSON response as a String; however, it is not intended to be human-readable. When expected as an input type, any string (such as `"4"`) or integer (such as `4`) input value will be accepted as an ID. (required)
         name: The `String` scalar type represents textual data, represented as UTF-8 character sequences. The String type is most often used by GraphQL to represent free-form human-readable text. (required)
         avatar: The `ID` scalar type represents a unique identifier, often used to refetch an object or as key for a cache. The ID type appears in a JSON response as a String; however, it is not intended to be human-readable. When expected as an input type, any string (such as `"4"`) or integer (such as `4`) input value will be accepted as an ID. (required)
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
         Profile
     """
+    variables: dict[str, Any] = {}
+    _input: dict[str, Any] = {}
+    _input["id"] = id
+    _input["name"] = name
+    _input["avatar"] = avatar
+    variables["input"] = _input
     return (
-        await aexecute(
-            UpdateUserProfileMutation,
-            {"input": {"id": id, "name": name, "avatar": avatar}},
-            rath=rath,
-        )
+        await aexecute(UpdateUserProfileMutation, variables, rath=rath)
     ).update_profile
 
 
 def update_user_profile(
-    id: IDCoercible, name: str, avatar: IDCoercible, rath: Optional[UnlokRath] = None
+    id: IDCoercible, name: str, avatar: IDCoercible, rath: UnlokRath | None = None
 ) -> Profile:
     """UpdateUserProfile
 
@@ -3698,176 +4113,290 @@ def update_user_profile(
         id: The `ID` scalar type represents a unique identifier, often used to refetch an object or as key for a cache. The ID type appears in a JSON response as a String; however, it is not intended to be human-readable. When expected as an input type, any string (such as `"4"`) or integer (such as `4`) input value will be accepted as an ID. (required)
         name: The `String` scalar type represents textual data, represented as UTF-8 character sequences. The String type is most often used by GraphQL to represent free-form human-readable text. (required)
         avatar: The `ID` scalar type represents a unique identifier, often used to refetch an object or as key for a cache. The ID type appears in a JSON response as a String; however, it is not intended to be human-readable. When expected as an input type, any string (such as `"4"`) or integer (such as `4`) input value will be accepted as an ID. (required)
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
         Profile
     """
-    return execute(
-        UpdateUserProfileMutation,
-        {"input": {"id": id, "name": name, "avatar": avatar}},
-        rath=rath,
-    ).update_profile
+    variables: dict[str, Any] = {}
+    _input: dict[str, Any] = {}
+    _input["id"] = id
+    _input["name"] = name
+    _input["avatar"] = avatar
+    variables["input"] = _input
+    return execute(UpdateUserProfileMutation, variables, rath=rath).update_profile
+
+
+async def acreate_redeem_token(
+    manifest: ManifestInput,
+    token: str | None | UnsetType = UNSET,
+    expires_in_days: int | None | UnsetType = UNSET,
+    max_redemptions: int | None | UnsetType = UNSET,
+    rath: UnlokRath | None = None,
+) -> DetailRedeemToken:
+    """CreateRedeemToken
+
+
+    Args:
+        manifest:  (required)
+        token: The `String` scalar type represents textual data, represented as UTF-8 character sequences. The String type is most often used by GraphQL to represent free-form human-readable text.
+        expires_in_days: The `Int` scalar type represents non-fractional signed whole numeric values. Int can represent values between -(2^31) and 2^31 - 1.
+        max_redemptions: The `Int` scalar type represents non-fractional signed whole numeric values. Int can represent values between -(2^31) and 2^31 - 1.
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+
+    Returns:
+        DetailRedeemToken
+    """
+    variables: dict[str, Any] = {}
+    _input: dict[str, Any] = {}
+    _input["manifest"] = manifest
+    if token is not UNSET:
+        _input["token"] = token
+    if expires_in_days is not UNSET:
+        _input["expiresInDays"] = expires_in_days
+    if max_redemptions is not UNSET:
+        _input["maxRedemptions"] = max_redemptions
+    variables["input"] = _input
+    return (
+        await aexecute(CreateRedeemTokenMutation, variables, rath=rath)
+    ).create_redeem_token
+
+
+def create_redeem_token(
+    manifest: ManifestInput,
+    token: str | None | UnsetType = UNSET,
+    expires_in_days: int | None | UnsetType = UNSET,
+    max_redemptions: int | None | UnsetType = UNSET,
+    rath: UnlokRath | None = None,
+) -> DetailRedeemToken:
+    """CreateRedeemToken
+
+
+    Args:
+        manifest:  (required)
+        token: The `String` scalar type represents textual data, represented as UTF-8 character sequences. The String type is most often used by GraphQL to represent free-form human-readable text.
+        expires_in_days: The `Int` scalar type represents non-fractional signed whole numeric values. Int can represent values between -(2^31) and 2^31 - 1.
+        max_redemptions: The `Int` scalar type represents non-fractional signed whole numeric values. Int can represent values between -(2^31) and 2^31 - 1.
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+
+    Returns:
+        DetailRedeemToken
+    """
+    variables: dict[str, Any] = {}
+    _input: dict[str, Any] = {}
+    _input["manifest"] = manifest
+    if token is not UNSET:
+        _input["token"] = token
+    if expires_in_days is not UNSET:
+        _input["expiresInDays"] = expires_in_days
+    if max_redemptions is not UNSET:
+        _input["maxRedemptions"] = max_redemptions
+    variables["input"] = _input
+    return execute(CreateRedeemTokenMutation, variables, rath=rath).create_redeem_token
+
+
+async def adelete_redeem_token(id: IDCoercible, rath: UnlokRath | None = None) -> ID:
+    """DeleteRedeemToken
+
+
+    Args:
+        id (ID): No description
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+
+    Returns:
+        ID
+    """
+    variables: dict[str, Any] = {}
+    variables["id"] = id
+    return (
+        await aexecute(DeleteRedeemTokenMutation, variables, rath=rath)
+    ).delete_redeem_token
+
+
+def delete_redeem_token(id: IDCoercible, rath: UnlokRath | None = None) -> ID:
+    """DeleteRedeemToken
+
+
+    Args:
+        id (ID): No description
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+
+    Returns:
+        ID
+    """
+    variables: dict[str, Any] = {}
+    variables["id"] = id
+    return execute(DeleteRedeemTokenMutation, variables, rath=rath).delete_redeem_token
 
 
 async def acreate_stash(
-    name: Optional[str] = None,
-    description: Optional[str] = "",
-    rath: Optional[UnlokRath] = None,
+    name: str | None | UnsetType = UNSET,
+    description: str | None | UnsetType = UNSET,
+    rath: UnlokRath | None = None,
 ) -> ListStash:
     """CreateStash
 
     Create a new stash
 
     Args:
-        name (Optional[str], optional): No description.
-        description (Optional[str], optional): No description. Defaults to
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        name (str | None, optional): No description.
+        description (str | None, optional): No description. Defaults to
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
         ListStash
     """
-    return (
-        await aexecute(
-            CreateStashMutation, {"name": name, "description": description}, rath=rath
-        )
-    ).create_stash
+    variables: dict[str, Any] = {}
+    if name is not UNSET:
+        variables["name"] = name
+    if description is not UNSET:
+        variables["description"] = description
+    return (await aexecute(CreateStashMutation, variables, rath=rath)).create_stash
 
 
 def create_stash(
-    name: Optional[str] = None,
-    description: Optional[str] = "",
-    rath: Optional[UnlokRath] = None,
+    name: str | None | UnsetType = UNSET,
+    description: str | None | UnsetType = UNSET,
+    rath: UnlokRath | None = None,
 ) -> ListStash:
     """CreateStash
 
     Create a new stash
 
     Args:
-        name (Optional[str], optional): No description.
-        description (Optional[str], optional): No description. Defaults to
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        name (str | None, optional): No description.
+        description (str | None, optional): No description. Defaults to
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
         ListStash
     """
-    return execute(
-        CreateStashMutation, {"name": name, "description": description}, rath=rath
-    ).create_stash
+    variables: dict[str, Any] = {}
+    if name is not UNSET:
+        variables["name"] = name
+    if description is not UNSET:
+        variables["description"] = description
+    return execute(CreateStashMutation, variables, rath=rath).create_stash
 
 
 async def aadd_items_to_stash(
-    stash: ID, items: List[StashItemInput], rath: Optional[UnlokRath] = None
-) -> Tuple[StashItem, ...]:
+    stash: IDCoercible, items: list[StashItemInput], rath: UnlokRath | None = None
+) -> tuple[StashItem, ...]:
     """AddItemsToStash
 
     Add items to a stash
 
     Args:
         stash (ID): No description
-        items (List[StashItemInput]): No description
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        items (list[StashItemInput]): No description
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
-        List[StashItem]
+        list[StashItem]
     """
+    variables: dict[str, Any] = {}
+    variables["stash"] = stash
+    variables["items"] = items
     return (
-        await aexecute(
-            AddItemsToStashMutation, {"stash": stash, "items": items}, rath=rath
-        )
+        await aexecute(AddItemsToStashMutation, variables, rath=rath)
     ).add_items_to_stash
 
 
 def add_items_to_stash(
-    stash: ID, items: List[StashItemInput], rath: Optional[UnlokRath] = None
-) -> Tuple[StashItem, ...]:
+    stash: IDCoercible, items: list[StashItemInput], rath: UnlokRath | None = None
+) -> tuple[StashItem, ...]:
     """AddItemsToStash
 
     Add items to a stash
 
     Args:
         stash (ID): No description
-        items (List[StashItemInput]): No description
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        items (list[StashItemInput]): No description
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
-        List[StashItem]
+        list[StashItem]
     """
-    return execute(
-        AddItemsToStashMutation, {"stash": stash, "items": items}, rath=rath
-    ).add_items_to_stash
+    variables: dict[str, Any] = {}
+    variables["stash"] = stash
+    variables["items"] = items
+    return execute(AddItemsToStashMutation, variables, rath=rath).add_items_to_stash
 
 
 async def adelete_stash_items(
-    items: List[ID], rath: Optional[UnlokRath] = None
-) -> Tuple[ID, ...]:
+    items: list[IDCoercible], rath: UnlokRath | None = None
+) -> tuple[ID, ...]:
     """DeleteStashItems
 
     Delete items from a stash
 
     Args:
-        items (List[ID]): No description
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        items (list[ID]): No description
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
-        List[ID]
+        list[ID]
     """
+    variables: dict[str, Any] = {}
+    variables["items"] = items
     return (
-        await aexecute(DeleteStashItemsMutation, {"items": items}, rath=rath)
+        await aexecute(DeleteStashItemsMutation, variables, rath=rath)
     ).delete_stash_items
 
 
 def delete_stash_items(
-    items: List[ID], rath: Optional[UnlokRath] = None
-) -> Tuple[ID, ...]:
+    items: list[IDCoercible], rath: UnlokRath | None = None
+) -> tuple[ID, ...]:
     """DeleteStashItems
 
     Delete items from a stash
 
     Args:
-        items (List[ID]): No description
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        items (list[ID]): No description
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
-        List[ID]
+        list[ID]
     """
-    return execute(
-        DeleteStashItemsMutation, {"items": items}, rath=rath
-    ).delete_stash_items
+    variables: dict[str, Any] = {}
+    variables["items"] = items
+    return execute(DeleteStashItemsMutation, variables, rath=rath).delete_stash_items
 
 
-async def adelete_stash(stash: ID, rath: Optional[UnlokRath] = None) -> ID:
+async def adelete_stash(stash: IDCoercible, rath: UnlokRath | None = None) -> ID:
     """DeleteStash
 
 
     Args:
         stash (ID): No description
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
         ID
     """
-    return (
-        await aexecute(DeleteStashMutation, {"stash": stash}, rath=rath)
-    ).delete_stash
+    variables: dict[str, Any] = {}
+    variables["stash"] = stash
+    return (await aexecute(DeleteStashMutation, variables, rath=rath)).delete_stash
 
 
-def delete_stash(stash: ID, rath: Optional[UnlokRath] = None) -> ID:
+def delete_stash(stash: IDCoercible, rath: UnlokRath | None = None) -> ID:
     """DeleteStash
 
 
     Args:
         stash (ID): No description
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
         ID
     """
-    return execute(DeleteStashMutation, {"stash": stash}, rath=rath).delete_stash
+    variables: dict[str, Any] = {}
+    variables["stash"] = stash
+    return execute(DeleteStashMutation, variables, rath=rath).delete_stash
 
 
 async def arequest_media_upload(
-    key: str, datalayer: str, rath: Optional[UnlokRath] = None
+    key: str, datalayer: str, rath: UnlokRath | None = None
 ) -> PresignedPostCredentials:
     """RequestMediaUpload
 
@@ -3875,20 +4404,21 @@ async def arequest_media_upload(
     Args:
         key (str): No description
         datalayer (str): No description
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
         PresignedPostCredentials
     """
+    variables: dict[str, Any] = {}
+    variables["key"] = key
+    variables["datalayer"] = datalayer
     return (
-        await aexecute(
-            RequestMediaUploadMutation, {"key": key, "datalayer": datalayer}, rath=rath
-        )
+        await aexecute(RequestMediaUploadMutation, variables, rath=rath)
     ).request_media_upload
 
 
 def request_media_upload(
-    key: str, datalayer: str, rath: Optional[UnlokRath] = None
+    key: str, datalayer: str, rath: UnlokRath | None = None
 ) -> PresignedPostCredentials:
     """RequestMediaUpload
 
@@ -3896,775 +4426,893 @@ def request_media_upload(
     Args:
         key (str): No description
         datalayer (str): No description
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
         PresignedPostCredentials
     """
+    variables: dict[str, Any] = {}
+    variables["key"] = key
+    variables["datalayer"] = datalayer
     return execute(
-        RequestMediaUploadMutation, {"key": key, "datalayer": datalayer}, rath=rath
+        RequestMediaUploadMutation, variables, rath=rath
     ).request_media_upload
 
 
 async def aapps(
-    filters: Optional[AppFilter] = None,
-    pagination: Optional[OffsetPaginationInput] = None,
-    rath: Optional[UnlokRath] = None,
-) -> Tuple[ListApp, ...]:
+    filters: AppFilter | None | UnsetType = UNSET,
+    pagination: OffsetPaginationInput | None | UnsetType = UNSET,
+    rath: UnlokRath | None = None,
+) -> tuple[ListApp, ...]:
     """Apps
 
 
     Args:
-        filters (Optional[AppFilter], optional): No description.
-        pagination (Optional[OffsetPaginationInput], optional): No description.
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        filters (AppFilter | None, optional): No description.
+        pagination (OffsetPaginationInput | None, optional): No description.
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
-        List[ListApp]
+        list[ListApp]
     """
-    return (
-        await aexecute(
-            AppsQuery, {"filters": filters, "pagination": pagination}, rath=rath
-        )
-    ).apps
+    variables: dict[str, Any] = {}
+    if filters is not UNSET:
+        variables["filters"] = filters
+    if pagination is not UNSET:
+        variables["pagination"] = pagination
+    return (await aexecute(AppsQuery, variables, rath=rath)).apps
 
 
 def apps(
-    filters: Optional[AppFilter] = None,
-    pagination: Optional[OffsetPaginationInput] = None,
-    rath: Optional[UnlokRath] = None,
-) -> Tuple[ListApp, ...]:
+    filters: AppFilter | None | UnsetType = UNSET,
+    pagination: OffsetPaginationInput | None | UnsetType = UNSET,
+    rath: UnlokRath | None = None,
+) -> tuple[ListApp, ...]:
     """Apps
 
 
     Args:
-        filters (Optional[AppFilter], optional): No description.
-        pagination (Optional[OffsetPaginationInput], optional): No description.
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        filters (AppFilter | None, optional): No description.
+        pagination (OffsetPaginationInput | None, optional): No description.
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
-        List[ListApp]
+        list[ListApp]
     """
-    return execute(
-        AppsQuery, {"filters": filters, "pagination": pagination}, rath=rath
-    ).apps
+    variables: dict[str, Any] = {}
+    if filters is not UNSET:
+        variables["filters"] = filters
+    if pagination is not UNSET:
+        variables["pagination"] = pagination
+    return execute(AppsQuery, variables, rath=rath).apps
 
 
 async def aapp(
-    identifier: Optional[str] = None,
-    id: Optional[ID] = None,
-    client_id: Optional[ID] = None,
-    rath: Optional[UnlokRath] = None,
+    identifier: str | None | UnsetType = UNSET,
+    id: IDCoercible | None | UnsetType = UNSET,
+    client_id: IDCoercible | None | UnsetType = UNSET,
+    rath: UnlokRath | None = None,
 ) -> DetailApp:
     """App
 
 
     Args:
-        identifier (Optional[str], optional): No description.
-        id (Optional[ID], optional): No description.
-        client_id (Optional[ID], optional): No description.
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        identifier (str | None, optional): No description.
+        id (ID | None, optional): No description.
+        client_id (ID | None, optional): No description.
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
         DetailApp
     """
-    return (
-        await aexecute(
-            AppQuery,
-            {"identifier": identifier, "id": id, "clientId": client_id},
-            rath=rath,
-        )
-    ).app
+    variables: dict[str, Any] = {}
+    if identifier is not UNSET:
+        variables["identifier"] = identifier
+    if id is not UNSET:
+        variables["id"] = id
+    if client_id is not UNSET:
+        variables["clientId"] = client_id
+    return (await aexecute(AppQuery, variables, rath=rath)).app
 
 
 def app(
-    identifier: Optional[str] = None,
-    id: Optional[ID] = None,
-    client_id: Optional[ID] = None,
-    rath: Optional[UnlokRath] = None,
+    identifier: str | None | UnsetType = UNSET,
+    id: IDCoercible | None | UnsetType = UNSET,
+    client_id: IDCoercible | None | UnsetType = UNSET,
+    rath: UnlokRath | None = None,
 ) -> DetailApp:
     """App
 
 
     Args:
-        identifier (Optional[str], optional): No description.
-        id (Optional[ID], optional): No description.
-        client_id (Optional[ID], optional): No description.
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        identifier (str | None, optional): No description.
+        id (ID | None, optional): No description.
+        client_id (ID | None, optional): No description.
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
         DetailApp
     """
-    return execute(
-        AppQuery, {"identifier": identifier, "id": id, "clientId": client_id}, rath=rath
-    ).app
+    variables: dict[str, Any] = {}
+    if identifier is not UNSET:
+        variables["identifier"] = identifier
+    if id is not UNSET:
+        variables["id"] = id
+    if client_id is not UNSET:
+        variables["clientId"] = client_id
+    return execute(AppQuery, variables, rath=rath).app
 
 
-async def adetail_app(id: ID, rath: Optional[UnlokRath] = None) -> DetailApp:
+async def adetail_app(id: IDCoercible, rath: UnlokRath | None = None) -> DetailApp:
     """DetailApp
 
 
     Args:
         id (ID): No description
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
         DetailApp
     """
-    return (await aexecute(DetailAppQuery, {"id": id}, rath=rath)).app
+    variables: dict[str, Any] = {}
+    variables["id"] = id
+    return (await aexecute(DetailAppQuery, variables, rath=rath)).app
 
 
-def detail_app(id: ID, rath: Optional[UnlokRath] = None) -> DetailApp:
+def detail_app(id: IDCoercible, rath: UnlokRath | None = None) -> DetailApp:
     """DetailApp
 
 
     Args:
         id (ID): No description
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
         DetailApp
     """
-    return execute(DetailAppQuery, {"id": id}, rath=rath).app
+    variables: dict[str, Any] = {}
+    variables["id"] = id
+    return execute(DetailAppQuery, variables, rath=rath).app
 
 
 async def aclients(
-    filters: Optional[ClientFilter] = None,
-    pagination: Optional[OffsetPaginationInput] = None,
-    rath: Optional[UnlokRath] = None,
-) -> Tuple[ListClient, ...]:
+    filters: ClientFilter | None | UnsetType = UNSET,
+    pagination: OffsetPaginationInput | None | UnsetType = UNSET,
+    rath: UnlokRath | None = None,
+) -> tuple[ListClient, ...]:
     """Clients
 
 
     Args:
-        filters (Optional[ClientFilter], optional): No description.
-        pagination (Optional[OffsetPaginationInput], optional): No description.
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        filters (ClientFilter | None, optional): No description.
+        pagination (OffsetPaginationInput | None, optional): No description.
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
-        List[ListClient]
+        list[ListClient]
     """
-    return (
-        await aexecute(
-            ClientsQuery, {"filters": filters, "pagination": pagination}, rath=rath
-        )
-    ).clients
+    variables: dict[str, Any] = {}
+    if filters is not UNSET:
+        variables["filters"] = filters
+    if pagination is not UNSET:
+        variables["pagination"] = pagination
+    return (await aexecute(ClientsQuery, variables, rath=rath)).clients
 
 
 def clients(
-    filters: Optional[ClientFilter] = None,
-    pagination: Optional[OffsetPaginationInput] = None,
-    rath: Optional[UnlokRath] = None,
-) -> Tuple[ListClient, ...]:
+    filters: ClientFilter | None | UnsetType = UNSET,
+    pagination: OffsetPaginationInput | None | UnsetType = UNSET,
+    rath: UnlokRath | None = None,
+) -> tuple[ListClient, ...]:
     """Clients
 
 
     Args:
-        filters (Optional[ClientFilter], optional): No description.
-        pagination (Optional[OffsetPaginationInput], optional): No description.
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        filters (ClientFilter | None, optional): No description.
+        pagination (OffsetPaginationInput | None, optional): No description.
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
-        List[ListClient]
+        list[ListClient]
     """
-    return execute(
-        ClientsQuery, {"filters": filters, "pagination": pagination}, rath=rath
-    ).clients
+    variables: dict[str, Any] = {}
+    if filters is not UNSET:
+        variables["filters"] = filters
+    if pagination is not UNSET:
+        variables["pagination"] = pagination
+    return execute(ClientsQuery, variables, rath=rath).clients
 
 
-async def adetail_client(id: ID, rath: Optional[UnlokRath] = None) -> DetailClient:
+async def adetail_client(
+    id: IDCoercible, rath: UnlokRath | None = None
+) -> DetailClient:
     """DetailClient
 
 
     Args:
         id (ID): No description
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
         DetailClient
     """
-    return (await aexecute(DetailClientQuery, {"id": id}, rath=rath)).client
+    variables: dict[str, Any] = {}
+    variables["id"] = id
+    return (await aexecute(DetailClientQuery, variables, rath=rath)).client
 
 
-def detail_client(id: ID, rath: Optional[UnlokRath] = None) -> DetailClient:
+def detail_client(id: IDCoercible, rath: UnlokRath | None = None) -> DetailClient:
     """DetailClient
 
 
     Args:
         id (ID): No description
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
         DetailClient
     """
-    return execute(DetailClientQuery, {"id": id}, rath=rath).client
+    variables: dict[str, Any] = {}
+    variables["id"] = id
+    return execute(DetailClientQuery, variables, rath=rath).client
 
 
 async def amy_managed_clients(
-    kind: ClientKind, rath: Optional[UnlokRath] = None
-) -> ListClient:
+    kind: ClientKind, rath: UnlokRath | None = None
+) -> tuple[ListClient, ...]:
     """MyManagedClients
 
 
     Args:
         kind (ClientKind): No description
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
-        ListClient
+        list[ListClient]
     """
+    variables: dict[str, Any] = {}
+    variables["kind"] = kind
     return (
-        await aexecute(MyManagedClientsQuery, {"kind": kind}, rath=rath)
+        await aexecute(MyManagedClientsQuery, variables, rath=rath)
     ).my_managed_clients
 
 
 def my_managed_clients(
-    kind: ClientKind, rath: Optional[UnlokRath] = None
-) -> ListClient:
+    kind: ClientKind, rath: UnlokRath | None = None
+) -> tuple[ListClient, ...]:
     """MyManagedClients
 
 
     Args:
         kind (ClientKind): No description
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
-        ListClient
+        list[ListClient]
     """
-    return execute(MyManagedClientsQuery, {"kind": kind}, rath=rath).my_managed_clients
+    variables: dict[str, Any] = {}
+    variables["kind"] = kind
+    return execute(MyManagedClientsQuery, variables, rath=rath).my_managed_clients
 
 
-async def aclient(client_id: ID, rath: Optional[UnlokRath] = None) -> DetailClient:
+async def aclient(
+    client_id: IDCoercible, rath: UnlokRath | None = None
+) -> DetailClient:
     """Client
 
 
     Args:
         client_id (ID): No description
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
         DetailClient
     """
-    return (await aexecute(ClientQuery, {"clientId": client_id}, rath=rath)).client
+    variables: dict[str, Any] = {}
+    variables["clientId"] = client_id
+    return (await aexecute(ClientQuery, variables, rath=rath)).client
 
 
-def client(client_id: ID, rath: Optional[UnlokRath] = None) -> DetailClient:
+def client(client_id: IDCoercible, rath: UnlokRath | None = None) -> DetailClient:
     """Client
 
 
     Args:
         client_id (ID): No description
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
         DetailClient
     """
-    return execute(ClientQuery, {"clientId": client_id}, rath=rath).client
+    variables: dict[str, Any] = {}
+    variables["clientId"] = client_id
+    return execute(ClientQuery, variables, rath=rath).client
 
 
 async def acomments_for(
-    object: ID, identifier: str, rath: Optional[UnlokRath] = None
-) -> Tuple[ListComment, ...]:
+    object: IDCoercible, identifier: str, rath: UnlokRath | None = None
+) -> tuple[ListComment, ...]:
     """CommentsFor
 
 
     Args:
         object (ID): No description
         identifier (str): No description
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
-        List[ListComment]
+        list[ListComment]
     """
-    return (
-        await aexecute(
-            CommentsForQuery, {"object": object, "identifier": identifier}, rath=rath
-        )
-    ).comments_for
+    variables: dict[str, Any] = {}
+    variables["object"] = object
+    variables["identifier"] = identifier
+    return (await aexecute(CommentsForQuery, variables, rath=rath)).comments_for
 
 
 def comments_for(
-    object: ID, identifier: str, rath: Optional[UnlokRath] = None
-) -> Tuple[ListComment, ...]:
+    object: IDCoercible, identifier: str, rath: UnlokRath | None = None
+) -> tuple[ListComment, ...]:
     """CommentsFor
 
 
     Args:
         object (ID): No description
         identifier (str): No description
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
-        List[ListComment]
+        list[ListComment]
     """
-    return execute(
-        CommentsForQuery, {"object": object, "identifier": identifier}, rath=rath
-    ).comments_for
+    variables: dict[str, Any] = {}
+    variables["object"] = object
+    variables["identifier"] = identifier
+    return execute(CommentsForQuery, variables, rath=rath).comments_for
 
 
-async def amy_mentions(rath: Optional[UnlokRath] = None) -> Tuple[MentionComment, ...]:
+async def amy_mentions(rath: UnlokRath | None = None) -> tuple[MentionComment, ...]:
     """MyMentions
 
 
     Args:
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
-        List[MentionComment]
+        list[MentionComment]
     """
-    return (await aexecute(MyMentionsQuery, {}, rath=rath)).my_mentions
+    variables: dict[str, Any] = {}
+    return (await aexecute(MyMentionsQuery, variables, rath=rath)).my_mentions
 
 
-def my_mentions(rath: Optional[UnlokRath] = None) -> Tuple[MentionComment, ...]:
+def my_mentions(rath: UnlokRath | None = None) -> tuple[MentionComment, ...]:
     """MyMentions
 
 
     Args:
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
-        List[MentionComment]
+        list[MentionComment]
     """
-    return execute(MyMentionsQuery, {}, rath=rath).my_mentions
+    variables: dict[str, Any] = {}
+    return execute(MyMentionsQuery, variables, rath=rath).my_mentions
 
 
-async def adetail_comment(id: ID, rath: Optional[UnlokRath] = None) -> DetailComment:
+async def adetail_comment(
+    id: IDCoercible, rath: UnlokRath | None = None
+) -> DetailComment:
     """DetailComment
 
 
     Args:
         id (ID): No description
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
         DetailComment
     """
-    return (await aexecute(DetailCommentQuery, {"id": id}, rath=rath)).comment
+    variables: dict[str, Any] = {}
+    variables["id"] = id
+    return (await aexecute(DetailCommentQuery, variables, rath=rath)).comment
 
 
-def detail_comment(id: ID, rath: Optional[UnlokRath] = None) -> DetailComment:
+def detail_comment(id: IDCoercible, rath: UnlokRath | None = None) -> DetailComment:
     """DetailComment
 
 
     Args:
         id (ID): No description
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
         DetailComment
     """
-    return execute(DetailCommentQuery, {"id": id}, rath=rath).comment
+    variables: dict[str, Any] = {}
+    variables["id"] = id
+    return execute(DetailCommentQuery, variables, rath=rath).comment
 
 
 async def agroup_options(
-    search: Optional[str] = None,
-    values: Optional[List[ID]] = None,
-    rath: Optional[UnlokRath] = None,
-) -> Tuple[GroupOptionsQueryOptions, ...]:
+    search: str | None | UnsetType = UNSET,
+    values: list[IDCoercible] | None | UnsetType = UNSET,
+    rath: UnlokRath | None = None,
+) -> tuple[GroupOptionsQueryOptions, ...]:
     """GroupOptions
 
 
     Args:
-        search (Optional[str], optional): No description.
-        values (Optional[List[ID]], optional): No description.
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        search (str | None, optional): No description.
+        values (list[ID] | None, optional): No description.
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
-        List[GroupOptionsQueryGroups]
+        list[GroupOptionsQueryGroups]
     """
-    return (
-        await aexecute(
-            GroupOptionsQuery, {"search": search, "values": values}, rath=rath
-        )
-    ).options
+    variables: dict[str, Any] = {}
+    if search is not UNSET:
+        variables["search"] = search
+    if values is not UNSET:
+        variables["values"] = values
+    return (await aexecute(GroupOptionsQuery, variables, rath=rath)).options
 
 
 def group_options(
-    search: Optional[str] = None,
-    values: Optional[List[ID]] = None,
-    rath: Optional[UnlokRath] = None,
-) -> Tuple[GroupOptionsQueryOptions, ...]:
+    search: str | None | UnsetType = UNSET,
+    values: list[IDCoercible] | None | UnsetType = UNSET,
+    rath: UnlokRath | None = None,
+) -> tuple[GroupOptionsQueryOptions, ...]:
     """GroupOptions
 
 
     Args:
-        search (Optional[str], optional): No description.
-        values (Optional[List[ID]], optional): No description.
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        search (str | None, optional): No description.
+        values (list[ID] | None, optional): No description.
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
-        List[GroupOptionsQueryGroups]
+        list[GroupOptionsQueryGroups]
     """
-    return execute(
-        GroupOptionsQuery, {"search": search, "values": values}, rath=rath
-    ).options
+    variables: dict[str, Any] = {}
+    if search is not UNSET:
+        variables["search"] = search
+    if values is not UNSET:
+        variables["values"] = values
+    return execute(GroupOptionsQuery, variables, rath=rath).options
 
 
-async def adetail_group(id: ID, rath: Optional[UnlokRath] = None) -> DetailGroup:
+async def adetail_group(id: IDCoercible, rath: UnlokRath | None = None) -> DetailGroup:
     """DetailGroup
 
 
     Args:
         id (ID): No description
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
         DetailGroup
     """
-    return (await aexecute(DetailGroupQuery, {"id": id}, rath=rath)).group
+    variables: dict[str, Any] = {}
+    variables["id"] = id
+    return (await aexecute(DetailGroupQuery, variables, rath=rath)).group
 
 
-def detail_group(id: ID, rath: Optional[UnlokRath] = None) -> DetailGroup:
+def detail_group(id: IDCoercible, rath: UnlokRath | None = None) -> DetailGroup:
     """DetailGroup
 
 
     Args:
         id (ID): No description
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
         DetailGroup
     """
-    return execute(DetailGroupQuery, {"id": id}, rath=rath).group
+    variables: dict[str, Any] = {}
+    variables["id"] = id
+    return execute(DetailGroupQuery, variables, rath=rath).group
 
 
 async def agroups(
-    filters: Optional[GroupFilter] = None,
-    pagination: Optional[OffsetPaginationInput] = None,
-    rath: Optional[UnlokRath] = None,
-) -> Tuple[ListGroup, ...]:
+    filters: GroupFilter | None | UnsetType = UNSET,
+    pagination: OffsetPaginationInput | None | UnsetType = UNSET,
+    rath: UnlokRath | None = None,
+) -> tuple[ListGroup, ...]:
     """Groups
 
 
     Args:
-        filters (Optional[GroupFilter], optional): No description.
-        pagination (Optional[OffsetPaginationInput], optional): No description.
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        filters (GroupFilter | None, optional): No description.
+        pagination (OffsetPaginationInput | None, optional): No description.
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
-        List[ListGroup]
+        list[ListGroup]
     """
-    return (
-        await aexecute(
-            GroupsQuery, {"filters": filters, "pagination": pagination}, rath=rath
-        )
-    ).groups
+    variables: dict[str, Any] = {}
+    if filters is not UNSET:
+        variables["filters"] = filters
+    if pagination is not UNSET:
+        variables["pagination"] = pagination
+    return (await aexecute(GroupsQuery, variables, rath=rath)).groups
 
 
 def groups(
-    filters: Optional[GroupFilter] = None,
-    pagination: Optional[OffsetPaginationInput] = None,
-    rath: Optional[UnlokRath] = None,
-) -> Tuple[ListGroup, ...]:
+    filters: GroupFilter | None | UnsetType = UNSET,
+    pagination: OffsetPaginationInput | None | UnsetType = UNSET,
+    rath: UnlokRath | None = None,
+) -> tuple[ListGroup, ...]:
     """Groups
 
 
     Args:
-        filters (Optional[GroupFilter], optional): No description.
-        pagination (Optional[OffsetPaginationInput], optional): No description.
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        filters (GroupFilter | None, optional): No description.
+        pagination (OffsetPaginationInput | None, optional): No description.
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
-        List[ListGroup]
+        list[ListGroup]
     """
-    return execute(
-        GroupsQuery, {"filters": filters, "pagination": pagination}, rath=rath
-    ).groups
+    variables: dict[str, Any] = {}
+    if filters is not UNSET:
+        variables["filters"] = filters
+    if pagination is not UNSET:
+        variables["pagination"] = pagination
+    return execute(GroupsQuery, variables, rath=rath).groups
 
 
 async def alayers(
-    filters: Optional[LayerFilter] = None,
-    pagination: Optional[OffsetPaginationInput] = None,
-    rath: Optional[UnlokRath] = None,
-) -> Tuple[ListLayer, ...]:
+    filters: LayerFilter | None | UnsetType = UNSET,
+    pagination: OffsetPaginationInput | None | UnsetType = UNSET,
+    rath: UnlokRath | None = None,
+) -> tuple[ListLayer, ...]:
     """Layers
 
 
     Args:
-        filters (Optional[LayerFilter], optional): No description.
-        pagination (Optional[OffsetPaginationInput], optional): No description.
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        filters (LayerFilter | None, optional): No description.
+        pagination (OffsetPaginationInput | None, optional): No description.
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
-        List[ListLayer]
+        list[ListLayer]
     """
-    return (
-        await aexecute(
-            LayersQuery, {"filters": filters, "pagination": pagination}, rath=rath
-        )
-    ).layers
+    variables: dict[str, Any] = {}
+    if filters is not UNSET:
+        variables["filters"] = filters
+    if pagination is not UNSET:
+        variables["pagination"] = pagination
+    return (await aexecute(LayersQuery, variables, rath=rath)).layers
 
 
 def layers(
-    filters: Optional[LayerFilter] = None,
-    pagination: Optional[OffsetPaginationInput] = None,
-    rath: Optional[UnlokRath] = None,
-) -> Tuple[ListLayer, ...]:
+    filters: LayerFilter | None | UnsetType = UNSET,
+    pagination: OffsetPaginationInput | None | UnsetType = UNSET,
+    rath: UnlokRath | None = None,
+) -> tuple[ListLayer, ...]:
     """Layers
 
 
     Args:
-        filters (Optional[LayerFilter], optional): No description.
-        pagination (Optional[OffsetPaginationInput], optional): No description.
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        filters (LayerFilter | None, optional): No description.
+        pagination (OffsetPaginationInput | None, optional): No description.
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
-        List[ListLayer]
+        list[ListLayer]
     """
-    return execute(
-        LayersQuery, {"filters": filters, "pagination": pagination}, rath=rath
-    ).layers
+    variables: dict[str, Any] = {}
+    if filters is not UNSET:
+        variables["filters"] = filters
+    if pagination is not UNSET:
+        variables["pagination"] = pagination
+    return execute(LayersQuery, variables, rath=rath).layers
 
 
-async def adetail_layer(id: ID, rath: Optional[UnlokRath] = None) -> Layer:
+async def adetail_layer(id: IDCoercible, rath: UnlokRath | None = None) -> Layer:
     """DetailLayer
 
 
     Args:
         id (ID): No description
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
         Layer
     """
-    return (await aexecute(DetailLayerQuery, {"id": id}, rath=rath)).layer
+    variables: dict[str, Any] = {}
+    variables["id"] = id
+    return (await aexecute(DetailLayerQuery, variables, rath=rath)).layer
 
 
-def detail_layer(id: ID, rath: Optional[UnlokRath] = None) -> Layer:
+def detail_layer(id: IDCoercible, rath: UnlokRath | None = None) -> Layer:
     """DetailLayer
 
 
     Args:
         id (ID): No description
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
         Layer
     """
-    return execute(DetailLayerQuery, {"id": id}, rath=rath).layer
+    variables: dict[str, Any] = {}
+    variables["id"] = id
+    return execute(DetailLayerQuery, variables, rath=rath).layer
+
+
+async def aredeem_token(
+    id: IDCoercible, rath: UnlokRath | None = None
+) -> DetailRedeemToken:
+    """RedeemToken
+
+
+    Args:
+        id (ID): No description
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+
+    Returns:
+        DetailRedeemToken
+    """
+    variables: dict[str, Any] = {}
+    variables["id"] = id
+    return (await aexecute(RedeemTokenQuery, variables, rath=rath)).redeem_token
+
+
+def redeem_token(id: IDCoercible, rath: UnlokRath | None = None) -> DetailRedeemToken:
+    """RedeemToken
+
+
+    Args:
+        id (ID): No description
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+
+    Returns:
+        DetailRedeemToken
+    """
+    variables: dict[str, Any] = {}
+    variables["id"] = id
+    return execute(RedeemTokenQuery, variables, rath=rath).redeem_token
 
 
 async def aredeem_tokens(
-    filters: Optional[RedeemTokenFilter] = None,
-    pagination: Optional[OffsetPaginationInput] = None,
-    rath: Optional[UnlokRath] = None,
-) -> Tuple[ListRedeemToken, ...]:
+    filters: RedeemTokenFilter | None | UnsetType = UNSET,
+    pagination: OffsetPaginationInput | None | UnsetType = UNSET,
+    rath: UnlokRath | None = None,
+) -> tuple[ListRedeemToken, ...]:
     """RedeemTokens
 
 
     Args:
-        filters (Optional[RedeemTokenFilter], optional): No description.
-        pagination (Optional[OffsetPaginationInput], optional): No description.
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        filters (RedeemTokenFilter | None, optional): No description.
+        pagination (OffsetPaginationInput | None, optional): No description.
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
-        List[ListRedeemToken]
+        list[ListRedeemToken]
     """
-    return (
-        await aexecute(
-            RedeemTokensQuery, {"filters": filters, "pagination": pagination}, rath=rath
-        )
-    ).redeem_tokens
+    variables: dict[str, Any] = {}
+    if filters is not UNSET:
+        variables["filters"] = filters
+    if pagination is not UNSET:
+        variables["pagination"] = pagination
+    return (await aexecute(RedeemTokensQuery, variables, rath=rath)).redeem_tokens
 
 
 def redeem_tokens(
-    filters: Optional[RedeemTokenFilter] = None,
-    pagination: Optional[OffsetPaginationInput] = None,
-    rath: Optional[UnlokRath] = None,
-) -> Tuple[ListRedeemToken, ...]:
+    filters: RedeemTokenFilter | None | UnsetType = UNSET,
+    pagination: OffsetPaginationInput | None | UnsetType = UNSET,
+    rath: UnlokRath | None = None,
+) -> tuple[ListRedeemToken, ...]:
     """RedeemTokens
 
 
     Args:
-        filters (Optional[RedeemTokenFilter], optional): No description.
-        pagination (Optional[OffsetPaginationInput], optional): No description.
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        filters (RedeemTokenFilter | None, optional): No description.
+        pagination (OffsetPaginationInput | None, optional): No description.
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
-        List[ListRedeemToken]
+        list[ListRedeemToken]
     """
-    return execute(
-        RedeemTokensQuery, {"filters": filters, "pagination": pagination}, rath=rath
-    ).redeem_tokens
+    variables: dict[str, Any] = {}
+    if filters is not UNSET:
+        variables["filters"] = filters
+    if pagination is not UNSET:
+        variables["pagination"] = pagination
+    return execute(RedeemTokensQuery, variables, rath=rath).redeem_tokens
 
 
-async def areleases(rath: Optional[UnlokRath] = None) -> Tuple[ListRelease, ...]:
+async def areleases(rath: UnlokRath | None = None) -> tuple[ListRelease, ...]:
     """Releases
 
 
     Args:
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
-        List[ListRelease]
+        list[ListRelease]
     """
-    return (await aexecute(ReleasesQuery, {}, rath=rath)).releases
+    variables: dict[str, Any] = {}
+    return (await aexecute(ReleasesQuery, variables, rath=rath)).releases
 
 
-def releases(rath: Optional[UnlokRath] = None) -> Tuple[ListRelease, ...]:
+def releases(rath: UnlokRath | None = None) -> tuple[ListRelease, ...]:
     """Releases
 
 
     Args:
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
-        List[ListRelease]
+        list[ListRelease]
     """
-    return execute(ReleasesQuery, {}, rath=rath).releases
+    variables: dict[str, Any] = {}
+    return execute(ReleasesQuery, variables, rath=rath).releases
 
 
 async def arelease(
-    identifier: Optional[str] = None,
-    version: Optional[str] = None,
-    id: Optional[ID] = None,
-    client_id: Optional[ID] = None,
-    rath: Optional[UnlokRath] = None,
+    identifier: str | None | UnsetType = UNSET,
+    version: str | None | UnsetType = UNSET,
+    id: IDCoercible | None | UnsetType = UNSET,
+    client_id: IDCoercible | None | UnsetType = UNSET,
+    rath: UnlokRath | None = None,
 ) -> DetailRelease:
     """Release
 
 
     Args:
-        identifier (Optional[str], optional): No description.
-        version (Optional[str], optional): No description.
-        id (Optional[ID], optional): No description.
-        client_id (Optional[ID], optional): No description.
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        identifier (str | None, optional): No description.
+        version (str | None, optional): No description.
+        id (ID | None, optional): No description.
+        client_id (ID | None, optional): No description.
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
         DetailRelease
     """
-    return (
-        await aexecute(
-            ReleaseQuery,
-            {
-                "identifier": identifier,
-                "version": version,
-                "id": id,
-                "clientId": client_id,
-            },
-            rath=rath,
-        )
-    ).release
+    variables: dict[str, Any] = {}
+    if identifier is not UNSET:
+        variables["identifier"] = identifier
+    if version is not UNSET:
+        variables["version"] = version
+    if id is not UNSET:
+        variables["id"] = id
+    if client_id is not UNSET:
+        variables["clientId"] = client_id
+    return (await aexecute(ReleaseQuery, variables, rath=rath)).release
 
 
 def release(
-    identifier: Optional[str] = None,
-    version: Optional[str] = None,
-    id: Optional[ID] = None,
-    client_id: Optional[ID] = None,
-    rath: Optional[UnlokRath] = None,
+    identifier: str | None | UnsetType = UNSET,
+    version: str | None | UnsetType = UNSET,
+    id: IDCoercible | None | UnsetType = UNSET,
+    client_id: IDCoercible | None | UnsetType = UNSET,
+    rath: UnlokRath | None = None,
 ) -> DetailRelease:
     """Release
 
 
     Args:
-        identifier (Optional[str], optional): No description.
-        version (Optional[str], optional): No description.
-        id (Optional[ID], optional): No description.
-        client_id (Optional[ID], optional): No description.
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        identifier (str | None, optional): No description.
+        version (str | None, optional): No description.
+        id (ID | None, optional): No description.
+        client_id (ID | None, optional): No description.
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
         DetailRelease
     """
-    return execute(
-        ReleaseQuery,
-        {"identifier": identifier, "version": version, "id": id, "clientId": client_id},
-        rath=rath,
-    ).release
+    variables: dict[str, Any] = {}
+    if identifier is not UNSET:
+        variables["identifier"] = identifier
+    if version is not UNSET:
+        variables["version"] = version
+    if id is not UNSET:
+        variables["id"] = id
+    if client_id is not UNSET:
+        variables["clientId"] = client_id
+    return execute(ReleaseQuery, variables, rath=rath).release
 
 
-async def adetail_release(id: ID, rath: Optional[UnlokRath] = None) -> DetailRelease:
+async def adetail_release(
+    id: IDCoercible, rath: UnlokRath | None = None
+) -> DetailRelease:
     """DetailRelease
 
 
     Args:
         id (ID): No description
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
         DetailRelease
     """
-    return (await aexecute(DetailReleaseQuery, {"id": id}, rath=rath)).release
+    variables: dict[str, Any] = {}
+    variables["id"] = id
+    return (await aexecute(DetailReleaseQuery, variables, rath=rath)).release
 
 
-def detail_release(id: ID, rath: Optional[UnlokRath] = None) -> DetailRelease:
+def detail_release(id: IDCoercible, rath: UnlokRath | None = None) -> DetailRelease:
     """DetailRelease
 
 
     Args:
         id (ID): No description
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
         DetailRelease
     """
-    return execute(DetailReleaseQuery, {"id": id}, rath=rath).release
+    variables: dict[str, Any] = {}
+    variables["id"] = id
+    return execute(DetailReleaseQuery, variables, rath=rath).release
 
 
-async def ascopes(rath: Optional[UnlokRath] = None) -> Tuple[ScopesQueryScopes, ...]:
+async def ascopes(rath: UnlokRath | None = None) -> tuple[ScopesQueryScopes, ...]:
     """Scopes
 
 
     Args:
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
-        List[ScopesQueryScopes]
+        list[ScopesQueryScopes]
     """
-    return (await aexecute(ScopesQuery, {}, rath=rath)).scopes
+    variables: dict[str, Any] = {}
+    return (await aexecute(ScopesQuery, variables, rath=rath)).scopes
 
 
-def scopes(rath: Optional[UnlokRath] = None) -> Tuple[ScopesQueryScopes, ...]:
+def scopes(rath: UnlokRath | None = None) -> tuple[ScopesQueryScopes, ...]:
     """Scopes
 
 
     Args:
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
-        List[ScopesQueryScopes]
+        list[ScopesQueryScopes]
     """
-    return execute(ScopesQuery, {}, rath=rath).scopes
+    variables: dict[str, Any] = {}
+    return execute(ScopesQuery, variables, rath=rath).scopes
 
 
 async def ascopes_options(
-    rath: Optional[UnlokRath] = None,
-) -> Tuple[ScopesOptionsQueryOptions, ...]:
+    rath: UnlokRath | None = None,
+) -> tuple[ScopesOptionsQueryOptions, ...]:
     """ScopesOptions
 
 
     Args:
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
-        List[ScopesOptionsQueryScopes]
+        list[ScopesOptionsQueryScopes]
     """
-    return (await aexecute(ScopesOptionsQuery, {}, rath=rath)).options
+    variables: dict[str, Any] = {}
+    return (await aexecute(ScopesOptionsQuery, variables, rath=rath)).options
 
 
 def scopes_options(
-    rath: Optional[UnlokRath] = None,
-) -> Tuple[ScopesOptionsQueryOptions, ...]:
+    rath: UnlokRath | None = None,
+) -> tuple[ScopesOptionsQueryOptions, ...]:
     """ScopesOptions
 
 
     Args:
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
-        List[ScopesOptionsQueryScopes]
+        list[ScopesOptionsQueryScopes]
     """
-    return execute(ScopesOptionsQuery, {}, rath=rath).options
+    variables: dict[str, Any] = {}
+    return execute(ScopesOptionsQuery, variables, rath=rath).options
 
 
 async def aglobal_search(
     no_users: bool,
     no_groups: bool,
-    search: Optional[str] = None,
-    pagination: Optional[OffsetPaginationInput] = None,
-    rath: Optional[UnlokRath] = None,
+    search: str | None | UnsetType = UNSET,
+    pagination: OffsetPaginationInput | None | UnsetType = UNSET,
+    rath: UnlokRath | None = None,
 ) -> GlobalSearchQuery:
     """GlobalSearch
 
@@ -4672,31 +5320,29 @@ async def aglobal_search(
     Args:
         no_users (bool): No description
         no_groups (bool): No description
-        search (Optional[str], optional): No description.
-        pagination (Optional[OffsetPaginationInput], optional): No description.
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        search (str | None, optional): No description.
+        pagination (OffsetPaginationInput | None, optional): No description.
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
         GlobalSearchQuery
     """
-    return await aexecute(
-        GlobalSearchQuery,
-        {
-            "search": search,
-            "noUsers": no_users,
-            "noGroups": no_groups,
-            "pagination": pagination,
-        },
-        rath=rath,
-    )
+    variables: dict[str, Any] = {}
+    if search is not UNSET:
+        variables["search"] = search
+    variables["noUsers"] = no_users
+    variables["noGroups"] = no_groups
+    if pagination is not UNSET:
+        variables["pagination"] = pagination
+    return await aexecute(GlobalSearchQuery, variables, rath=rath)
 
 
 def global_search(
     no_users: bool,
     no_groups: bool,
-    search: Optional[str] = None,
-    pagination: Optional[OffsetPaginationInput] = None,
-    rath: Optional[UnlokRath] = None,
+    search: str | None | UnsetType = UNSET,
+    pagination: OffsetPaginationInput | None | UnsetType = UNSET,
+    rath: UnlokRath | None = None,
 ) -> GlobalSearchQuery:
     """GlobalSearch
 
@@ -4704,514 +5350,564 @@ def global_search(
     Args:
         no_users (bool): No description
         no_groups (bool): No description
-        search (Optional[str], optional): No description.
-        pagination (Optional[OffsetPaginationInput], optional): No description.
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        search (str | None, optional): No description.
+        pagination (OffsetPaginationInput | None, optional): No description.
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
         GlobalSearchQuery
     """
-    return execute(
-        GlobalSearchQuery,
-        {
-            "search": search,
-            "noUsers": no_users,
-            "noGroups": no_groups,
-            "pagination": pagination,
-        },
-        rath=rath,
-    )
+    variables: dict[str, Any] = {}
+    if search is not UNSET:
+        variables["search"] = search
+    variables["noUsers"] = no_users
+    variables["noGroups"] = no_groups
+    if pagination is not UNSET:
+        variables["pagination"] = pagination
+    return execute(GlobalSearchQuery, variables, rath=rath)
 
 
 async def alist_service_instances(
-    pagination: Optional[OffsetPaginationInput] = None,
-    filters: Optional[ServiceInstanceFilter] = None,
-    rath: Optional[UnlokRath] = None,
-) -> Tuple[ListServiceInstance, ...]:
+    pagination: OffsetPaginationInput | None | UnsetType = UNSET,
+    filters: ServiceInstanceFilter | None | UnsetType = UNSET,
+    rath: UnlokRath | None = None,
+) -> tuple[ListServiceInstance, ...]:
     """ListServiceInstances
 
 
     Args:
-        pagination (Optional[OffsetPaginationInput], optional): No description.
-        filters (Optional[ServiceInstanceFilter], optional): No description.
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        pagination (OffsetPaginationInput | None, optional): No description.
+        filters (ServiceInstanceFilter | None, optional): No description.
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
-        List[ListServiceInstance]
+        list[ListServiceInstance]
     """
+    variables: dict[str, Any] = {}
+    if pagination is not UNSET:
+        variables["pagination"] = pagination
+    if filters is not UNSET:
+        variables["filters"] = filters
     return (
-        await aexecute(
-            ListServiceInstancesQuery,
-            {"pagination": pagination, "filters": filters},
-            rath=rath,
-        )
+        await aexecute(ListServiceInstancesQuery, variables, rath=rath)
     ).service_instances
 
 
 def list_service_instances(
-    pagination: Optional[OffsetPaginationInput] = None,
-    filters: Optional[ServiceInstanceFilter] = None,
-    rath: Optional[UnlokRath] = None,
-) -> Tuple[ListServiceInstance, ...]:
+    pagination: OffsetPaginationInput | None | UnsetType = UNSET,
+    filters: ServiceInstanceFilter | None | UnsetType = UNSET,
+    rath: UnlokRath | None = None,
+) -> tuple[ListServiceInstance, ...]:
     """ListServiceInstances
 
 
     Args:
-        pagination (Optional[OffsetPaginationInput], optional): No description.
-        filters (Optional[ServiceInstanceFilter], optional): No description.
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        pagination (OffsetPaginationInput | None, optional): No description.
+        filters (ServiceInstanceFilter | None, optional): No description.
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
-        List[ListServiceInstance]
+        list[ListServiceInstance]
     """
-    return execute(
-        ListServiceInstancesQuery,
-        {"pagination": pagination, "filters": filters},
-        rath=rath,
-    ).service_instances
+    variables: dict[str, Any] = {}
+    if pagination is not UNSET:
+        variables["pagination"] = pagination
+    if filters is not UNSET:
+        variables["filters"] = filters
+    return execute(ListServiceInstancesQuery, variables, rath=rath).service_instances
 
 
 async def aget_service_instance(
-    id: ID, rath: Optional[UnlokRath] = None
+    id: IDCoercible, rath: UnlokRath | None = None
 ) -> ServiceInstance:
     """GetServiceInstance
 
 
     Args:
         id (ID): No description
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
         ServiceInstance
     """
+    variables: dict[str, Any] = {}
+    variables["id"] = id
     return (
-        await aexecute(GetServiceInstanceQuery, {"id": id}, rath=rath)
+        await aexecute(GetServiceInstanceQuery, variables, rath=rath)
     ).service_instance
 
 
-def get_service_instance(id: ID, rath: Optional[UnlokRath] = None) -> ServiceInstance:
+def get_service_instance(
+    id: IDCoercible, rath: UnlokRath | None = None
+) -> ServiceInstance:
     """GetServiceInstance
 
 
     Args:
         id (ID): No description
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
         ServiceInstance
     """
-    return execute(GetServiceInstanceQuery, {"id": id}, rath=rath).service_instance
+    variables: dict[str, Any] = {}
+    variables["id"] = id
+    return execute(GetServiceInstanceQuery, variables, rath=rath).service_instance
 
 
 async def alist_service_releases(
-    pagination: Optional[OffsetPaginationInput] = None,
-    filters: Optional[ServiceReleaseFilter] = None,
-    rath: Optional[UnlokRath] = None,
-) -> Tuple[ListServiceRelease, ...]:
+    pagination: OffsetPaginationInput | None | UnsetType = UNSET,
+    filters: ServiceReleaseFilter | None | UnsetType = UNSET,
+    rath: UnlokRath | None = None,
+) -> tuple[ListServiceRelease, ...]:
     """ListServiceReleases
 
 
     Args:
-        pagination (Optional[OffsetPaginationInput], optional): No description.
-        filters (Optional[ServiceReleaseFilter], optional): No description.
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        pagination (OffsetPaginationInput | None, optional): No description.
+        filters (ServiceReleaseFilter | None, optional): No description.
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
-        List[ListServiceRelease]
+        list[ListServiceRelease]
     """
+    variables: dict[str, Any] = {}
+    if pagination is not UNSET:
+        variables["pagination"] = pagination
+    if filters is not UNSET:
+        variables["filters"] = filters
     return (
-        await aexecute(
-            ListServiceReleasesQuery,
-            {"pagination": pagination, "filters": filters},
-            rath=rath,
-        )
+        await aexecute(ListServiceReleasesQuery, variables, rath=rath)
     ).service_releases
 
 
 def list_service_releases(
-    pagination: Optional[OffsetPaginationInput] = None,
-    filters: Optional[ServiceReleaseFilter] = None,
-    rath: Optional[UnlokRath] = None,
-) -> Tuple[ListServiceRelease, ...]:
+    pagination: OffsetPaginationInput | None | UnsetType = UNSET,
+    filters: ServiceReleaseFilter | None | UnsetType = UNSET,
+    rath: UnlokRath | None = None,
+) -> tuple[ListServiceRelease, ...]:
     """ListServiceReleases
 
 
     Args:
-        pagination (Optional[OffsetPaginationInput], optional): No description.
-        filters (Optional[ServiceReleaseFilter], optional): No description.
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        pagination (OffsetPaginationInput | None, optional): No description.
+        filters (ServiceReleaseFilter | None, optional): No description.
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
-        List[ListServiceRelease]
+        list[ListServiceRelease]
     """
-    return execute(
-        ListServiceReleasesQuery,
-        {"pagination": pagination, "filters": filters},
-        rath=rath,
-    ).service_releases
+    variables: dict[str, Any] = {}
+    if pagination is not UNSET:
+        variables["pagination"] = pagination
+    if filters is not UNSET:
+        variables["filters"] = filters
+    return execute(ListServiceReleasesQuery, variables, rath=rath).service_releases
 
 
 async def aget_service_release(
-    id: ID, rath: Optional[UnlokRath] = None
+    id: IDCoercible, rath: UnlokRath | None = None
 ) -> ServiceRelease:
     """GetServiceRelease
 
 
     Args:
         id (ID): No description
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
         ServiceRelease
     """
+    variables: dict[str, Any] = {}
+    variables["id"] = id
     return (
-        await aexecute(GetServiceReleaseQuery, {"id": id}, rath=rath)
+        await aexecute(GetServiceReleaseQuery, variables, rath=rath)
     ).service_release
 
 
-def get_service_release(id: ID, rath: Optional[UnlokRath] = None) -> ServiceRelease:
+def get_service_release(
+    id: IDCoercible, rath: UnlokRath | None = None
+) -> ServiceRelease:
     """GetServiceRelease
 
 
     Args:
         id (ID): No description
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
         ServiceRelease
     """
-    return execute(GetServiceReleaseQuery, {"id": id}, rath=rath).service_release
+    variables: dict[str, Any] = {}
+    variables["id"] = id
+    return execute(GetServiceReleaseQuery, variables, rath=rath).service_release
 
 
 async def alist_services(
-    pagination: Optional[OffsetPaginationInput] = None,
-    filters: Optional[ServiceFilter] = None,
-    rath: Optional[UnlokRath] = None,
-) -> Tuple[ListService, ...]:
+    pagination: OffsetPaginationInput | None | UnsetType = UNSET,
+    filters: ServiceFilter | None | UnsetType = UNSET,
+    rath: UnlokRath | None = None,
+) -> tuple[ListService, ...]:
     """ListServices
 
 
     Args:
-        pagination (Optional[OffsetPaginationInput], optional): No description.
-        filters (Optional[ServiceFilter], optional): No description.
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        pagination (OffsetPaginationInput | None, optional): No description.
+        filters (ServiceFilter | None, optional): No description.
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
-        List[ListService]
+        list[ListService]
     """
-    return (
-        await aexecute(
-            ListServicesQuery, {"pagination": pagination, "filters": filters}, rath=rath
-        )
-    ).services
+    variables: dict[str, Any] = {}
+    if pagination is not UNSET:
+        variables["pagination"] = pagination
+    if filters is not UNSET:
+        variables["filters"] = filters
+    return (await aexecute(ListServicesQuery, variables, rath=rath)).services
 
 
 def list_services(
-    pagination: Optional[OffsetPaginationInput] = None,
-    filters: Optional[ServiceFilter] = None,
-    rath: Optional[UnlokRath] = None,
-) -> Tuple[ListService, ...]:
+    pagination: OffsetPaginationInput | None | UnsetType = UNSET,
+    filters: ServiceFilter | None | UnsetType = UNSET,
+    rath: UnlokRath | None = None,
+) -> tuple[ListService, ...]:
     """ListServices
 
 
     Args:
-        pagination (Optional[OffsetPaginationInput], optional): No description.
-        filters (Optional[ServiceFilter], optional): No description.
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        pagination (OffsetPaginationInput | None, optional): No description.
+        filters (ServiceFilter | None, optional): No description.
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
-        List[ListService]
+        list[ListService]
     """
-    return execute(
-        ListServicesQuery, {"pagination": pagination, "filters": filters}, rath=rath
-    ).services
+    variables: dict[str, Any] = {}
+    if pagination is not UNSET:
+        variables["pagination"] = pagination
+    if filters is not UNSET:
+        variables["filters"] = filters
+    return execute(ListServicesQuery, variables, rath=rath).services
 
 
-async def aget_service(id: ID, rath: Optional[UnlokRath] = None) -> Service:
+async def aget_service(id: IDCoercible, rath: UnlokRath | None = None) -> Service:
     """GetService
 
 
     Args:
         id (ID): No description
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
         Service
     """
-    return (await aexecute(GetServiceQuery, {"id": id}, rath=rath)).service
+    variables: dict[str, Any] = {}
+    variables["id"] = id
+    return (await aexecute(GetServiceQuery, variables, rath=rath)).service
 
 
-def get_service(id: ID, rath: Optional[UnlokRath] = None) -> Service:
+def get_service(id: IDCoercible, rath: UnlokRath | None = None) -> Service:
     """GetService
 
 
     Args:
         id (ID): No description
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
         Service
     """
-    return execute(GetServiceQuery, {"id": id}, rath=rath).service
+    variables: dict[str, Any] = {}
+    variables["id"] = id
+    return execute(GetServiceQuery, variables, rath=rath).service
 
 
 async def amy_stashes(
-    pagination: Optional[OffsetPaginationInput] = None, rath: Optional[UnlokRath] = None
-) -> Tuple[ListStash, ...]:
+    pagination: OffsetPaginationInput | None | UnsetType = UNSET,
+    rath: UnlokRath | None = None,
+) -> tuple[ListStash, ...]:
     """MyStashes
 
 
     Args:
-        pagination (Optional[OffsetPaginationInput], optional): No description.
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        pagination (OffsetPaginationInput | None, optional): No description.
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
-        List[ListStash]
+        list[ListStash]
     """
-    return (
-        await aexecute(MyStashesQuery, {"pagination": pagination}, rath=rath)
-    ).stashes
+    variables: dict[str, Any] = {}
+    if pagination is not UNSET:
+        variables["pagination"] = pagination
+    return (await aexecute(MyStashesQuery, variables, rath=rath)).stashes
 
 
 def my_stashes(
-    pagination: Optional[OffsetPaginationInput] = None, rath: Optional[UnlokRath] = None
-) -> Tuple[ListStash, ...]:
+    pagination: OffsetPaginationInput | None | UnsetType = UNSET,
+    rath: UnlokRath | None = None,
+) -> tuple[ListStash, ...]:
     """MyStashes
 
 
     Args:
-        pagination (Optional[OffsetPaginationInput], optional): No description.
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        pagination (OffsetPaginationInput | None, optional): No description.
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
-        List[ListStash]
+        list[ListStash]
     """
-    return execute(MyStashesQuery, {"pagination": pagination}, rath=rath).stashes
+    variables: dict[str, Any] = {}
+    if pagination is not UNSET:
+        variables["pagination"] = pagination
+    return execute(MyStashesQuery, variables, rath=rath).stashes
 
 
-async def ame(rath: Optional[UnlokRath] = None) -> DetailUser:
+async def ame(rath: UnlokRath | None = None) -> DetailUser:
     """Me
 
 
     Args:
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
         DetailUser
     """
-    return (await aexecute(MeQuery, {}, rath=rath)).me
+    variables: dict[str, Any] = {}
+    return (await aexecute(MeQuery, variables, rath=rath)).me
 
 
-def me(rath: Optional[UnlokRath] = None) -> DetailUser:
+def me(rath: UnlokRath | None = None) -> DetailUser:
     """Me
 
 
     Args:
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
         DetailUser
     """
-    return execute(MeQuery, {}, rath=rath).me
+    variables: dict[str, Any] = {}
+    return execute(MeQuery, variables, rath=rath).me
 
 
-async def auser(id: ID, rath: Optional[UnlokRath] = None) -> DetailUser:
+async def auser(id: IDCoercible, rath: UnlokRath | None = None) -> DetailUser:
     """User
 
 
     Args:
         id (ID): No description
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
         DetailUser
     """
-    return (await aexecute(UserQuery, {"id": id}, rath=rath)).user
+    variables: dict[str, Any] = {}
+    variables["id"] = id
+    return (await aexecute(UserQuery, variables, rath=rath)).user
 
 
-def user(id: ID, rath: Optional[UnlokRath] = None) -> DetailUser:
+def user(id: IDCoercible, rath: UnlokRath | None = None) -> DetailUser:
     """User
 
 
     Args:
         id (ID): No description
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
         DetailUser
     """
-    return execute(UserQuery, {"id": id}, rath=rath).user
+    variables: dict[str, Any] = {}
+    variables["id"] = id
+    return execute(UserQuery, variables, rath=rath).user
 
 
-async def adetail_user(id: ID, rath: Optional[UnlokRath] = None) -> DetailUser:
+async def adetail_user(id: IDCoercible, rath: UnlokRath | None = None) -> DetailUser:
     """DetailUser
 
 
     Args:
         id (ID): No description
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
         DetailUser
     """
-    return (await aexecute(DetailUserQuery, {"id": id}, rath=rath)).user
+    variables: dict[str, Any] = {}
+    variables["id"] = id
+    return (await aexecute(DetailUserQuery, variables, rath=rath)).user
 
 
-def detail_user(id: ID, rath: Optional[UnlokRath] = None) -> DetailUser:
+def detail_user(id: IDCoercible, rath: UnlokRath | None = None) -> DetailUser:
     """DetailUser
 
 
     Args:
         id (ID): No description
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
         DetailUser
     """
-    return execute(DetailUserQuery, {"id": id}, rath=rath).user
+    variables: dict[str, Any] = {}
+    variables["id"] = id
+    return execute(DetailUserQuery, variables, rath=rath).user
 
 
 async def ausers(
-    filters: Optional[UserFilter] = None,
-    pagination: Optional[OffsetPaginationInput] = None,
-    rath: Optional[UnlokRath] = None,
-) -> Tuple[ListUser, ...]:
+    filters: UserFilter | None | UnsetType = UNSET,
+    pagination: OffsetPaginationInput | None | UnsetType = UNSET,
+    rath: UnlokRath | None = None,
+) -> tuple[ListUser, ...]:
     """Users
 
 
     Args:
-        filters (Optional[UserFilter], optional): No description.
-        pagination (Optional[OffsetPaginationInput], optional): No description.
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        filters (UserFilter | None, optional): No description.
+        pagination (OffsetPaginationInput | None, optional): No description.
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
-        List[ListUser]
+        list[ListUser]
     """
-    return (
-        await aexecute(
-            UsersQuery, {"filters": filters, "pagination": pagination}, rath=rath
-        )
-    ).users
+    variables: dict[str, Any] = {}
+    if filters is not UNSET:
+        variables["filters"] = filters
+    if pagination is not UNSET:
+        variables["pagination"] = pagination
+    return (await aexecute(UsersQuery, variables, rath=rath)).users
 
 
 def users(
-    filters: Optional[UserFilter] = None,
-    pagination: Optional[OffsetPaginationInput] = None,
-    rath: Optional[UnlokRath] = None,
-) -> Tuple[ListUser, ...]:
+    filters: UserFilter | None | UnsetType = UNSET,
+    pagination: OffsetPaginationInput | None | UnsetType = UNSET,
+    rath: UnlokRath | None = None,
+) -> tuple[ListUser, ...]:
     """Users
 
 
     Args:
-        filters (Optional[UserFilter], optional): No description.
-        pagination (Optional[OffsetPaginationInput], optional): No description.
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        filters (UserFilter | None, optional): No description.
+        pagination (OffsetPaginationInput | None, optional): No description.
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
-        List[ListUser]
+        list[ListUser]
     """
-    return execute(
-        UsersQuery, {"filters": filters, "pagination": pagination}, rath=rath
-    ).users
+    variables: dict[str, Any] = {}
+    if filters is not UNSET:
+        variables["filters"] = filters
+    if pagination is not UNSET:
+        variables["pagination"] = pagination
+    return execute(UsersQuery, variables, rath=rath).users
 
 
 async def auser_options(
-    search: Optional[str] = None,
-    values: Optional[List[ID]] = None,
-    rath: Optional[UnlokRath] = None,
-) -> Tuple[UserOptionsQueryOptions, ...]:
+    search: str | None | UnsetType = UNSET,
+    values: list[IDCoercible] | None | UnsetType = UNSET,
+    rath: UnlokRath | None = None,
+) -> tuple[UserOptionsQueryOptions, ...]:
     """UserOptions
 
 
     Args:
-        search (Optional[str], optional): No description.
-        values (Optional[List[ID]], optional): No description.
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        search (str | None, optional): No description.
+        values (list[ID] | None, optional): No description.
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
-        List[UserOptionsQueryUsers]
+        list[UserOptionsQueryUsers]
     """
-    return (
-        await aexecute(
-            UserOptionsQuery, {"search": search, "values": values}, rath=rath
-        )
-    ).options
+    variables: dict[str, Any] = {}
+    if search is not UNSET:
+        variables["search"] = search
+    if values is not UNSET:
+        variables["values"] = values
+    return (await aexecute(UserOptionsQuery, variables, rath=rath)).options
 
 
 def user_options(
-    search: Optional[str] = None,
-    values: Optional[List[ID]] = None,
-    rath: Optional[UnlokRath] = None,
-) -> Tuple[UserOptionsQueryOptions, ...]:
+    search: str | None | UnsetType = UNSET,
+    values: list[IDCoercible] | None | UnsetType = UNSET,
+    rath: UnlokRath | None = None,
+) -> tuple[UserOptionsQueryOptions, ...]:
     """UserOptions
 
 
     Args:
-        search (Optional[str], optional): No description.
-        values (Optional[List[ID]], optional): No description.
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        search (str | None, optional): No description.
+        values (list[ID] | None, optional): No description.
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
-        List[UserOptionsQueryUsers]
+        list[UserOptionsQueryUsers]
     """
-    return execute(
-        UserOptionsQuery, {"search": search, "values": values}, rath=rath
-    ).options
+    variables: dict[str, Any] = {}
+    if search is not UNSET:
+        variables["search"] = search
+    if values is not UNSET:
+        variables["values"] = values
+    return execute(UserOptionsQuery, variables, rath=rath).options
 
 
-async def aprofile(rath: Optional[UnlokRath] = None) -> MeUser:
+async def aprofile(rath: UnlokRath | None = None) -> MeUser:
     """Profile
 
 
     Args:
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
         MeUser
     """
-    return (await aexecute(ProfileQuery, {}, rath=rath)).me
+    variables: dict[str, Any] = {}
+    return (await aexecute(ProfileQuery, variables, rath=rath)).me
 
 
-def profile(rath: Optional[UnlokRath] = None) -> MeUser:
+def profile(rath: UnlokRath | None = None) -> MeUser:
     """Profile
 
 
     Args:
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
         MeUser
     """
-    return execute(ProfileQuery, {}, rath=rath).me
+    variables: dict[str, Any] = {}
+    return execute(ProfileQuery, variables, rath=rath).me
 
 
 async def awatch_mentions(
-    rath: Optional[UnlokRath] = None,
+    rath: UnlokRath | None = None,
 ) -> AsyncIterator[MentionComment]:
     """WatchMentions
 
 
     Args:
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
         MentionComment
     """
-    async for event in asubscribe(WatchMentionsSubscription, {}, rath=rath):
+    variables: dict[str, Any] = {}
+    async for event in asubscribe(WatchMentionsSubscription, variables, rath=rath):
         yield event.mentions
 
 
-def watch_mentions(rath: Optional[UnlokRath] = None) -> Iterator[MentionComment]:
+def watch_mentions(rath: UnlokRath | None = None) -> Iterator[MentionComment]:
     """WatchMentions
 
 
     Args:
-        rath (unlok_next.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
+        rath (unlok.rath.UnlokRath, optional): The client we want to use (defaults to the currently active client)
 
     Returns:
         MentionComment
     """
-    for event in subscribe(WatchMentionsSubscription, {}, rath=rath):
+    variables: dict[str, Any] = {}
+    for event in subscribe(WatchMentionsSubscription, variables, rath=rath):
         yield event.mentions
 
 

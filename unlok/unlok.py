@@ -1,6 +1,6 @@
 from koil.composition import Composition
 
-from unlok_next.rath import UnlokRath
+from unlok.rath import UnlokRath
 
 
 class Unlok(Composition):

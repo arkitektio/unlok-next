@@ -1,0 +1,35 @@
+name: Integration Tests
+on:
+  push:
+    branches: [main, next]
+  pull_request:
+    branches: [main, next]
+jobs:
+  test_integration:
+    # The stack in tests/integration/docker-compose.yml runs the published
+    # jhnnsrs/lok image. Pinned to :next, the tag the backend actually publishes
+    # from its `next` branch; the schema under test is therefore whatever was
+    # last pushed there, not the server's working tree (see tests/conftest.py
+    # for the local override that closes that gap on a developer machine).
+    env:
+      LOK_SERVICE_TAG: next
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.13"]
+        os: [ubuntu-latest, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv and set the python version
+        uses: astral-sh/setup-uv@v6
+        with:
+          version: "latest"
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install the project
+        run: uv sync --all-extras --dev
+
+      - name: Run tests
+        run: uv run pytest -m integration

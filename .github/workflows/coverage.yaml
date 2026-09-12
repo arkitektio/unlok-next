@@ -2,7 +2,7 @@ name: Run Coverage
 
 on:
   pull_request:
-    branches: [main]  # or any branches you want to target
+    branches: [main]
   push:
     branches: [main]
 
@@ -20,10 +20,11 @@ jobs:
           version: "latest"
           python-version: "3.12"
 
-
       - name: Install the project
         run: uv sync --all-extras --dev
 
+      # No marker filter: the integration stack runs here too, so coverage
+      # includes the paths only a real lok exercises.
       - name: Run tests
         run: uv run pytest --cov --cov-branch --cov-report=xml
 

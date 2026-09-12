@@ -1,17 +1,16 @@
 {
-    "schema_url": "https://go.arkitekt.live/lok/schema",
-    "documents": "graphql/unlok-next/*/**.graphql",
+    "schema": "https://go.arkitekt.live/lok/schema",
+    "documents": "graphql/*/**.graphql",
     "extensions": {
         "turms": {
-            "pydantic_version": "v2",
             "domain": null,
-            "out_dir": "unlok_next/api",
+            "out_dir": "unlok/api",
             "dump_configuration": true,
             "configuration_name": "project.json",
             "dump_schema": true,
             "schema_name": "schema.graphql",
             "generated_name": "schema.py",
-            "documents": "graphql/unlok-next/*/**.graphql",
+            "documents": "graphql/*/**.graphql",
             "verbose": false,
             "exit_on_error": true,
             "allow_introspection": true,
@@ -30,8 +29,16 @@
                 "AppIdentifier": "str",
                 "UnsafeChild": "typing.Any",
                 "ServiceIdentifier": "str",
-                "Identifier": "str"
+                "Identifier": "str",
+                "JSON": "typing.Any"
             },
+            "coercible_scalars": {},
+            "coercible_inputs": {},
+            "graphql_default_class": null,
+            "deprecated_class": null,
+            "document_field_metadata": true,
+            "unset_type_class": null,
+            "unset_instance": null,
             "freeze": {
                 "enabled": true,
                 "types": [
@@ -41,19 +48,17 @@
                 ],
                 "exclude": null,
                 "include": null,
-                "exclude_fields": [],
-                "include_fields": [],
                 "convert_list_to_tuple": true
             },
             "create_catchall": true,
             "options": {
                 "enabled": true,
                 "extra": "forbid",
-                "allow_mutation": null,
-                "allow_population_by_field_name": true,
-                "orm_mode": null,
+                "populate_by_name": true,
+                "from_attributes": null,
                 "use_enum_values": true,
                 "validate_assignment": null,
+                "alias_mode": "split",
                 "types": [
                     "input"
                 ],
@@ -61,18 +66,12 @@
                 "include": null
             },
             "skip_forwards": false,
-            "additional_bases": {
-                "FlowGraph": [
-                    "kabinet.traits.Graph"
-                ]
-            },
-            "additional_config": {
-                "EdgeInput": {
-                    "allow_population_by_field_name": true
-                }
-            },
+            "min_python_version": "3.10",
+            "type_annotation_style": "auto",
+            "additional_bases": {},
+            "additional_config": {},
             "force_plugin_order": true,
-            "omited_document_rules": [],
+            "omitted_document_rules": [],
             "parsers": [],
             "plugins": [
                 {
@@ -97,7 +96,7 @@
                     ],
                     "global_kwargs": [
                         {
-                            "type": "unlok_next.rath.UnlokRath",
+                            "type": "unlok.rath.UnlokRath",
                             "key": "rath",
                             "description": "The client we want to use (defaults to the currently active client)"
                         }
@@ -106,29 +105,29 @@
                         {
                             "type": "subscription",
                             "is_async": true,
-                            "use": "unlok_next.funcs.asubscribe"
+                            "use": "unlok.funcs.asubscribe"
                         },
                         {
                             "type": "query",
                             "is_async": true,
-                            "use": "unlok_next.funcs.aexecute"
+                            "use": "unlok.funcs.aexecute"
                         },
                         {
                             "type": "mutation",
                             "is_async": true,
-                            "use": "unlok_next.funcs.aexecute"
+                            "use": "unlok.funcs.aexecute"
                         },
                         {
                             "type": "subscription",
-                            "use": "unlok_next.funcs.subscribe"
+                            "use": "unlok.funcs.subscribe"
                         },
                         {
                             "type": "query",
-                            "use": "unlok_next.funcs.execute"
+                            "use": "unlok.funcs.execute"
                         },
                         {
                             "type": "mutation",
-                            "use": "unlok_next.funcs.execute"
+                            "use": "unlok.funcs.execute"
                         }
                     ]
                 }

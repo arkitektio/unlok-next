@@ -1,0 +1,5 @@
+query RedeemToken($id: ID!) {
+  redeemToken(id: $id) {
+    ...DetailRedeemToken
+  }
+}

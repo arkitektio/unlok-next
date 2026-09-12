@@ -1,5 +1,67 @@
-apps: []
-db:
+# Configuration of the lok service inside the integration test stack
+# (tests/integration/docker-compose.yml). Everything in here is throwaway:
+# the signing key was generated for this stack only, the passwords are fixed,
+# and `debug: true` is what permits the empty `static_tokens` block.
+#
+# The organisation `demo` auto-configures the `localhost` hub from the
+# `localhost` kommunity partner, and the redeem token below is issued for that
+# hub: the test session redeems it (tests/conftest.py) to become a real,
+# development client of the `demo` organisation, exactly the way a deployed
+# container authenticates.
+deployment:
+  name: unlok-tests
+django:
+  admin:
+    email: admin@example.com
+    password: admin
+    username: admin
+  debug: true
+  hosts:
+    - "*"
+  secret_key: unlok-integration-tests-secret-key-not-for-production
+  csrf_trusted_origins:
+    - http://localhost
+  # The fakts envelope advertises lok itself under the `/lok` path, so the
+  # service has to be served there, as in every real deployment.
+  force_script_name: lok
+lok:
+  public_key: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCvSUtg4u9vuwFs4XXx8yeQ17VjhndNNky08WlFfgjPbrP3hrZzWK8dphE7ogtH1zzLMFIjsw8vQLUeDoJSfYi4MXzcU4F23ojBXrq71CT1esoz23WvPnObIldqBlE6FoTb2OotVX5QjJhVqdHLwGdCClwkBRH4kFjuv3tjzdSUwzHI9M/WK6OMuyaLru2QIT2b+fqLKuARNBl8u4iLJQsioM+OyvKW4DoQK1zA0IM4OW7l0JsRkAV5hgjHepn8wsb9u5ShipGkAj6JEtRtPAm9ZmrqduYhRnejevaXY5tdWlh+dXVNhwegV5CdcqiFkjaCzFa13gjpHoFsFhHs9pkl
+private_key: |
+  -----BEGIN PRIVATE KEY-----
+  MIIEugIBADANBgkqhkiG9w0BAQEFAASCBKQwggSgAgEAAoIBAQCvSUtg4u9vuwFs
+  4XXx8yeQ17VjhndNNky08WlFfgjPbrP3hrZzWK8dphE7ogtH1zzLMFIjsw8vQLUe
+  DoJSfYi4MXzcU4F23ojBXrq71CT1esoz23WvPnObIldqBlE6FoTb2OotVX5QjJhV
+  qdHLwGdCClwkBRH4kFjuv3tjzdSUwzHI9M/WK6OMuyaLru2QIT2b+fqLKuARNBl8
+  u4iLJQsioM+OyvKW4DoQK1zA0IM4OW7l0JsRkAV5hgjHepn8wsb9u5ShipGkAj6J
+  EtRtPAm9ZmrqduYhRnejevaXY5tdWlh+dXVNhwegV5CdcqiFkjaCzFa13gjpHoFs
+  FhHs9pklAgMBAAECggEAESLiOqOU8uBeYE2eYTv7Rz6/Xe58ZVEEqL/dIc0TgWv6
+  Lh2+YoJuBEEC+Eh8P9a7+8VKknDj8COsUTbr6LKbFh7IbSXAx2U0C2t+Z/RydIk/
+  kVhIJgy98pGl6BicAkjHTlLjefEcuzUzg1RpzTiPH7axkVfpjNpXx2dy4avyt2Q/
+  5bUw+gyyXFVV5NcesCwiINUrVo8j8+9fnWBodJsDVdXfIrG1vFf8mdylAeTs11/P
+  RM52VQ1QCry74NGUHBd0XJ+BOCKyMmrRZEYb77o8WWKW9Of5hDLUai1vtSxezjtE
+  VC80Inf0MEMCouiWjTpSnlb04QWDRqW8TyzG/Bwa1QKBgQD3EmEn3nNrd89uYgA8
+  F3KNVBlkUKghGp8sbMD5ePAhsfF0iNRU3hCGC6tDp3jlajzOIiRk7rRejZH9cS65
+  aRskffQ2odnR8gk7XtFgFDAdDDeb+6rbJ3mWCUKNL85KIuIHL3nj4WuX8txZsrog
+  DciJqYI/95+12G1XmY/ah6shDwKBgQC1ntbV0+6LEds1VsCnB/kJBmq/tsuviXzu
+  JraFHxgGnUSX7x1RCywf02JgMx3j4ELD+y7Ieby43C300dKxUlf71pvw5HvLHkDw
+  +zUFCT85s/tzab7M6q7ZfbKQDtZTuLqfZ7HBivMsit8HiC38d+mleGmQz30p8ZsH
+  gOPeGQ36iwKBgHBvbMc39E5zt3IEJxcxlG+8VdHQ4rIt60HMPAVLg/vRfpAJtJbq
+  d5qItOeUzu+X6RPldap49pwQ0N8FIr49lpyEtR4niXiBLLJX8/BFP5/4b1YMsTQK
+  QsqEbETT/IzAUxvx/wY1D0GWw7AOJaVwoFIFUcDKb2PRmfDDcTOBid8BAoGAKiJj
+  bM/x80l9NW6e2yE6YSGf+kIKFvsqhIVuqouAI2iw1R6gCoExB2Ee3Xp+YLNSSe0n
+  +VJkue46qyVSX9jemIo9OzGGlqS6JC3jKvvuMxDSMQBDR37aeZJzroACsQGWKg0A
+  bAo0SA0fmLu7D2syRTUeKH46Z1Spxp/cPVZKq+kCfyDsBkS0NpxXWbKmdM9smQ+I
+  zFWECONmLvWxckqsrzZzV+OUZe7IgsCh0QVdHRnvBMX+pxt/vy61y4qgvBWmEPZP
+  tgEh0JNa99Owp92p254XYsAebbZzeMtAIZv6iAgvBjXSzmI2kUdGiNv2klBNzqwT
+  dyI6s7KuzxPdGfE9vWY=
+  -----END PRIVATE KEY-----
+authentikate:
+  audience: "*"
+  # `issuers` is supplied by the compose file (AUTHENTIKATE__ISSUERS): its `iss`
+  # has to equal the OIDC issuer URL lok mints tokens with, which carries the
+  # host port of the current run.
+  static_tokens: {}
+postgres:
   db_name: lok
   dependency: db
   engine: django.db.backends.postgresql
@@ -7,157 +69,51 @@ db:
   password: hello_django
   port: 5432
   username: hello_django
-deployment:
-  name: default
-django:
-  admin:
-    email: admin@admin.com
-    password: admin
-    username: admin
-  debug: true
-  hosts:
-    - "*"
-  secret_key: c5d84589433e1d0b4198072c54ee0dd1
-force_script_name: ""
-my_script_name: ""
-groups:
-  - description: admin_group
-    name: admin
-  - description: The linz anatomy group
-    name: linz-iac
-  - description: The UC2 group
-    name: uc2
-livekit:
-  api_key: devkey
-  api_secret: secret
-  api_url: http://livekit:7880
-lok:
-  static_tokens:
-    test:
-      sub: 1
-      iss: lok
-  issuer: lok
-  key_type: RS256
-  public_key: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDXx/g7dyiwmfIQvkBKvUAM+KBuL1KdvZfZMlYhbyrz9Auk2xao1gLYiQJ183joiXadUreL4BugUrasQVdR9JvBWXOBeqm2FD5Ehf9VvqXdzCOQ7/fUXkb9N8sqmz5YitQuheKGDh0weNmVcfdsCGU38sACEvFQg+5dv1tqLbm7EllT+vogntDVX16DmvpvFEX4HYHpT8qM/xuqSB6yQ8+wBuQd3K7WTFgUrUqQx6zFrSMUbSArPrrY5Z0GJAeDAHKp4+V+um4mSHpYM2nBJ5pn80wYpsf97KIL9P+UJzjb/indB8dCqpPkAk3HogBhj67Tp5JoqCMoaXHFU3tiYQCp
-private_key: "-----BEGIN PRIVATE KEY-----
-
-  MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQDXx/g7dyiwmfIQ
-
-  vkBKvUAM+KBuL1KdvZfZMlYhbyrz9Auk2xao1gLYiQJ183joiXadUreL4BugUras
-
-  QVdR9JvBWXOBeqm2FD5Ehf9VvqXdzCOQ7/fUXkb9N8sqmz5YitQuheKGDh0weNmV
-
-  cfdsCGU38sACEvFQg+5dv1tqLbm7EllT+vogntDVX16DmvpvFEX4HYHpT8qM/xuq
-
-  SB6yQ8+wBuQd3K7WTFgUrUqQx6zFrSMUbSArPrrY5Z0GJAeDAHKp4+V+um4mSHpY
-
-  M2nBJ5pn80wYpsf97KIL9P+UJzjb/indB8dCqpPkAk3HogBhj67Tp5JoqCMoaXHF
-
-  U3tiYQCpAgMBAAECggEAFfZyEydlOlho9YBPzeumTcuulJh3ebu27XH8p0mH3y27
-
-  U6vDCitCPeTwHa5K46w+KPQm33NPjIlus2ixKRPTGKJwqcCg7nnv/ox++Sy++CzT
-
-  f+iU2oZABnz7zlnfxiZXQ2b4L/nWyby7NMVVUCcomkG4fl2MN0w+YkdcWBnQWjRr
-
-  j+KcG029zrhKI2uiXz2IysRPRAw58lWcvDO9H5q4eo9+qxV7UzbCvipOsjGFH6RJ
-
-  IwUyCz3XFOdC84taz2+xT0umJeG4RGDdiL0ZM1BC89BqFtQiOJntqaV6FgczKRTH
-
-  TcMuiYndX8QsZZ+zUZ2LjFRNi8u1TBkgczitBg0bQwKBgQDrMAe0xhCGP4n3zZoc
-
-  2Dlz8XFc2XvhCfFdkfE6zzbva2444LQ2uRcbPG1m419z138SsnNN2hw1JAermMj3
-
-  bcjMW2zsas2wkhTaLDkceHC1qFa55+TdkCNx5Min6n1Wnfr40j8Wvum9YstseuGk
-
-  BQIlbMz0ImGnU3QQRg7kesAf/wKBgQDq4E11mR4gqKxmW4RWT9cJ+DM285APaGXf
-
-  85fyjaVs1eVvZ5krY5vmemAOLk9v8F73Sn64zEtJVCQzD5YwihjmQ4dS+hn7f3j1
-
-  cY1Fw+2hJJHi8o63uPtRmLV/Cc787F2iMqi/YK36f4sJX8h63CBYYPf7buN7+T9t
-
-  4T3w0MnfVwKBgBUl03uQ18mKixhqN3Jiiv/+9OeZcscwgrCcP+m+2jy7F0UsB2ho
-
-  SkibrWa0CVA8T2PaAf49H44zuDDY4zFEgOrHScsUa3x2FkPr+BK0TcY35dx/mpfF
-
-  rzo9jUF0F2Mjf37CQQQFlLT/3jTZ89Iw1RmSZ/eH4+oM2gHgmtQ2qXH3AoGBAL9U
-
-  HIUxR9N+04FGB5Vv0FI0tzOKUM3cUzCNdDeHnzv7Obz4fVNU/whOo7SpkNg0zIdR
-
-  Tc0nziRbwGk/xy6fMA1S8Qds6IFwo439BAHSyt47tgNTZ2LN8xvS8/YafVyXBuc7
-
-  sS7EiLTH9PCb7+n1KvwTca6F9BVnQn41v4lN60RdAoGBAMwdn2xRp+Ywc8N9dvn8
-
-  S0ozU3Vk2qbV5altixspOoWzuyFi1o/r5bgma71QjAsgvWwPhBTOsByrmEhrvWpu
-
-  DDpLWRIGuAg5dG21Ddh8ZMaJhISmbvepUhm2fVLG3YzG0eE/KGJjX6AFGqLUOi1V
-
-  qv9UsZQ7iutdI3MsfEU9PWEL
-
-  -----END PRIVATE KEY-----
-
-  "
-public_key: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDXx/g7dyiwmfIQvkBKvUAM+KBuL1KdvZfZMlYhbyrz9Auk2xao1gLYiQJ183joiXadUreL4BugUrasQVdR9JvBWXOBeqm2FD5Ehf9VvqXdzCOQ7/fUXkb9N8sqmz5YitQuheKGDh0weNmVcfdsCGU38sACEvFQg+5dv1tqLbm7EllT+vogntDVX16DmvpvFEX4HYHpT8qM/xuqSB6yQ8+wBuQd3K7WTFgUrUqQx6zFrSMUbSArPrrY5Z0GJAeDAHKp4+V+um4mSHpYM2nBJ5pn80wYpsf97KIL9P+UJzjb/indB8dCqpPkAk3HogBhj67Tp5JoqCMoaXHFU3tiYQCp
-redeem_tokens:
-  - token: Y22joLbkjm4vtXMj_T4FD3U99Mb71pTFnUe-8KToAQI
-    user: admin
 redis:
   dependency: redis
   host: redis
   port: 6379
-scopes:
-  kabinet_add_repo: Add repositories to the database
-  kabinet_deploy: Deploy containers
-  mikro_read: Read image from the database
-  mikro_write: Write image to the database
-  openid: The open id connect scope
-  read: A generic read access
-  read_image: Read image from the database
-  rekuest_agent: Act as an agent
-  rekuest_call: Call other apps with rekuest
-  write: A generic write access
-token_expire_seconds: 700000
-users:
-  - name: Johannes Roos
-    username: jhnnsrs
-    password: mysecret-name
-    groups: [iac-linz, uc2]
-  - name: Benedict Diederich
-    username: beniroquai
-    password: my-other-name
-    groups: [uc2]
-ensured_layers:
-  - kind: tailscale
-    identifier: jhnnsrs-tailscale
-ensured_instances:
-  mikro_base:
-    builder: arkitekt.relpath
-    service: arkitekt.live.mikro
-    limited_to_groups:
-      - uc2
-    layer: web
-    params:
-      path: "mikro"
-  fluss_base:
-    builder: arkitekt.relpath
-    service: arkitekt.live.fluss
-    limited_to_users:
-      - jhnnsrs
-    layer: web
-    params:
-      path: "fluss"
-  kraph_base:
-    builder: arkitekt.relpath
-    service: arkitekt.live.mikro
-    layer: web
-    params:
-      path: "kraph"
-s3:
-  access_key: ZvBLOQAApECKXISSJyiox192s6RNhVgmN9LZhWFYbdA
-  buckets:
-    media: sleazy-tan-seahorse
-  dependency: minio
+  channel_prefix: lok
+datalayer:
+  access_key: minio_access_key
+  secret_key: minio_secret_key
   host: minio
-  name: lanky-green-dalmatian
   port: 9000
   protocol: http
-  secret_key: rqh27SKddiMciJ2RPSpQF3l_SYtlXNKCA9Fp3NgrYBQ
+  media:
+    bucket: media
+scopes:
+  openid: The open id connect scope
+  read: A generic read access
+  write: A generic write access
+kommunity_partners:
+  - identifier: localhost
+    name: Localhost
+    partner_kind: preauthorized
+    auto_configure: true
+    preconfigured_hub:
+      identifier: localhost
+      description: The hub every test client enrols into.
+organizations:
+  - name: Demo
+    identifier: demo
+    owner: demo
+    auto_configure: true
+users:
+  - name: Demo User
+    username: demo
+    password: demo
+    email: demo@example.com
+memberships:
+  - user: demo
+    organization: demo
+redeem_tokens:
+  - token: unlok-integration-tests-redeem-token
+    user: demo
+    organization: demo
+    hub: localhost
+    expires_in_days: null
+    max_redemptions: null
+account:
+  email_verification: none
+  login_methods: [username]

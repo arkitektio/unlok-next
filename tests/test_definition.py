@@ -1,10 +1,19 @@
+"""Smoke test: the enrolled client can talk to lok at all."""
+
 import pytest
-from unlok_next.api.schema import list_services
+
+from unlok.api.schema import list_services
+
 from .conftest import DeployedUnlok
 
 
 @pytest.mark.integration
-@pytest.mark.skip(reason="Integration test - only run when deploying")
-def test_list_user(deployed_app: DeployedUnlok) -> None:
-    x = list_services()
-    assert len(x) > 0, "Was not able to find any definitions"
+def test_enrolled_client_can_query(deployed_app: DeployedUnlok) -> None:
+    """The session redeemed the stack's token and holds a working client.
+
+    The test hub offers no services, so an empty tuple is the correct answer; what
+    is under test is that the query is authenticated and answered at all.
+    """
+    services = list_services()
+
+    assert isinstance(services, tuple)

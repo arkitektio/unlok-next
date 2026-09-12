@@ -1,12 +1,10 @@
 fragment Layer on Layer {
   id
   name
+  identifier
   description
   logo {
     presignedUrl
-  }
-  instances {
-    ...ListServiceInstance
   }
 }
 

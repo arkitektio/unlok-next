@@ -15,3 +15,26 @@ fragment ListRedeemToken on RedeemToken {
     }
   }
 }
+
+fragment DetailRedeemToken on RedeemToken {
+  id
+  token
+  expiresAt
+  maxRedemptions
+  redemptionCount
+  pinnedManifest
+  user {
+    id
+    email
+  }
+  client {
+    id
+    clientId
+    release {
+      version
+      app {
+        identifier
+      }
+    }
+  }
+}
